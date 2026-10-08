@@ -28,11 +28,19 @@ async function loadDeck(page, i, id) {
   if (!s.present) throw new Error(`missing audio for ${id}: ${s.path}`);
   const chooser = page.waitForEvent('filechooser');
   await page.locator(`#deck-${i} button`, { hasText: /Choose a file|Replace|Try another file/ }).first().click();
-  await (await chooser).setFiles(s.path);
+  // Hand the file over as bytes under its real name: given a path with a non-ASCII character (Marea's curly apostrophe),
+  // Playwright's file chooser silently delivered nothing and the run hung. The page still sees the real filename.
+  await (await chooser).setFiles({ name: s.file, mimeType: 'audio/mpeg', buffer: readFileSync(s.path) });
+  await page.waitForFunction((i) => !!window.__mx.decks[i], i, { timeout: 30e3, polling: 250 })
+    .catch(() => { throw new Error(`the file for ${id} never reached the page`); });
 }
 
 async function measurePair(browser, base, a, b) {
   const page = await browser.newPage();
+  try { return await measureOn(page, a, b, base); } finally { await page.close().catch(() => {}); }
+}
+
+async function measureOn(page, a, b, base) {
   // Harness-only: the Visuals page keeps a WebGL animation running behind the Mix tab, which costs about half a CPU
   // in headless Chromium. Throttle requestAnimationFrame to ~4 fps. Mix analysis (setTimeout chunks) and preview
   // rendering (OfflineAudioContext) don't use it, so measured results are unaffected; the product code is untouched.
@@ -40,14 +48,14 @@ async function measurePair(browser, base, a, b) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`${base}/?debug`);
-  await page.waitForFunction(() => !!window.__mx, null, { timeout: 120e3 });
+  await page.waitForFunction(() => !!window.__mx, null, { timeout: 120e3, polling: 250 });   // timer polling: rAF is throttled above
   await page.click('#tab-mix');
   await loadDeck(page, 0, a);
   await page.waitForFunction(() => window.__mx.decks[0] && window.__mx.decks[0].status !== 'loading', null, { timeout: ANALYZE_TIMEOUT, polling: 500 });
   await loadDeck(page, 1, b);
   await page.waitForFunction(() => window.__mx.decks[1] && window.__mx.decks[1].status !== 'loading', null, { timeout: ANALYZE_TIMEOUT, polling: 500 });
   const st = await page.evaluate(() => window.__mx.decks.map((d) => ({ status: d.status, error: d.error, note: d.note, sr: d.sr })));
-  if (st.some((d) => d.status !== 'ready')) { await page.close(); return { a, b, error: st.map((d) => d.error).filter(Boolean).join('; ') || 'a deck failed to analyze', pageErrors: errors }; }
+  if (st.some((d) => d.status !== 'ready')) return { a, b, error: st.map((d) => d.error).filter(Boolean).join('; ') || 'a deck failed to analyze', pageErrors: errors };
   await page.addScriptTag({ content: MEAS });
   const head = await page.evaluate(() => {
     const r = window.__mx.result, c = r.compat;
@@ -62,7 +70,6 @@ async function measurePair(browser, base, a, b) {
   });
   const ideas = [];
   for (const L of [1, 2, 3]) for (let i = 0; i < head.counts[L - 1]; i++) ideas.push(await page.evaluate(([L, i]) => window.__measureIdea(L, i), [L, i]));
-  await page.close();
   return { a, b, decks: st, ...head, ideas, pageErrors: errors };
 }
 
@@ -91,7 +98,8 @@ else pairs = manifest.pairs.flatMap((p) => args.includes('--one-way') ? [[p.a, p
 
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
-const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+// two pages run side by side, so stop Chromium from throttling timers in whichever one it considers in the background
+const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] });
 mkdirSync(OUT, { recursive: true });
 let next = 0;
 const worker = async () => {
