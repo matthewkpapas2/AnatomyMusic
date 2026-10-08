@@ -1,0 +1,17 @@
+{
+  "name": "anatomy",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Play any sound. Watch it come apart. Song analysis and a drop-first DJ transition planner.",
+  "engines": { "node": ">=20.12" },
+  "scripts": {
+    "start": "node server/index.mjs",
+    "build:single": "node tools/build-single.mjs",
+    "test": "node tools/build-single.mjs --check && node --test tests/unit/ && node tests/regression.mjs",
+    "test:songs": "node tests/profile-songs.mjs",
+    "test:pairs": "node tests/measure/run.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.0"
+  }
+}
