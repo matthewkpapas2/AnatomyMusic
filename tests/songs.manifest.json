@@ -1,0 +1,67 @@
+{
+  "about": "Test songs and pairs (docs/test-songs.md). Audio is never committed: 'file' is a filename looked up in the songs folder (ANATOMY_SONGS env var, else tests/songs.local.json {\"dir\": ...}, else ~/Downloads). 'published' values are from Beatport/songbpm.com as listed in 03-test-songs.md; 'v7' holds what anatomy7.html measured on 2026-10-05 for the original four songs.",
+  "songs": [
+    { "id": "fisher-losing-it", "file": "FISHER - Losing It (Official Audio).mp3", "artist": "FISHER", "title": "Losing It", "tier": 1,
+      "published": { "bpm": 125, "key": "G major", "length": "6:40 (Extended)" }, "received": "radio edit, 4:09", "status": "wrong-version" },
+    { "id": "maup-drugs", "file": "Mau P - Drugs From Amsterdam (Official Music Video).mp3", "artist": "Mau P", "title": "Drugs From Amsterdam", "tier": 1,
+      "published": { "bpm": 125, "key": "E♭ major", "length": "5:23 (Extended Mix)" }, "received": "music-video edit, 2:26", "status": "wrong-version" },
+    { "id": "avicii-levels", "file": "Levels (Original Version).mp3", "artist": "Avicii", "title": "Levels", "tier": 1,
+      "published": { "bpm": 126, "key": "E major / C♯ minor", "length": "5:38" }, "status": "ok" },
+    { "id": "garrix-animals", "file": "Martin Garrix - Animals (Original Mix).mp3", "artist": "Martin Garrix", "title": "Animals", "tier": 1,
+      "published": { "bpm": 128, "key": "F major", "length": "5:04" }, "status": "ok" },
+    { "id": "prydz-opus", "file": "Eric Prydz - Opus [Radio edit].mp3", "artist": "Eric Prydz", "title": "Opus", "tier": 1,
+      "published": { "bpm": 128, "key": "A major", "length": "9:03 (Original Mix)" }, "received": "radio edit, 5:28", "status": "wrong-version" },
+    { "id": "lake-turn-off-the-lights", "file": "Chris Lake feat Alexis Roberts - Turn Off The Lights.mp3", "artist": "Chris Lake & Alexis Roberts", "title": "Turn Off The Lights", "tier": 1,
+      "published": { "bpm": 125, "key": "B minor", "length": "3:31 (radio)" }, "received": "122 kbps", "status": "low-bitrate" },
+    { "id": "shm-dont-you-worry-child", "file": "Swedish House Mafia ft. John Martin - Don't You Worry Child (Official Video).mp3", "artist": "Swedish House Mafia ft. John Martin", "title": "Don't You Worry Child", "tier": 2,
+      "published": { "bpm": 129, "key": "D major", "length": "6:43 (Original Mix)" }, "received": "video version, 5:35", "status": "check-non-music-audio" },
+    { "id": "deadmau5-strobe", "file": "deadmau5 - Strobe.mp3", "artist": "deadmau5", "title": "Strobe", "tier": 2,
+      "published": { "bpm": 128, "bpmAlt": 88, "key": "A♭ minor", "length": "10:33" }, "received": "10:37, longer than the 600 s analysis cap", "status": "over-cap" },
+    { "id": "peggygou-nanana", "file": "[It Goes Like] Nanana.mp3", "artist": "Peggy Gou", "title": "(It Goes Like) Nanana", "tier": 2,
+      "published": { "bpm": 130, "key": "C minor", "length": "6:07" }, "status": "ok" },
+    { "id": "domdolla-girls", "file": "Dom Dolla - girl$ (Extended Mix).mp3", "artist": "Dom Dolla", "title": "girl$", "tier": 2,
+      "published": { "bpm": 134, "key": "G major", "length": null }, "status": "ok" },
+    { "id": "disclosure-latch", "file": "Disclosure - Latch ft. Sam Smith.mp3", "artist": "Disclosure ft. Sam Smith", "title": "Latch", "tier": 2,
+      "published": { "bpm": 122, "key": "C♯ major", "length": "4:17" }, "received": "134 kbps", "status": "low-bitrate" },
+    { "id": "fred-marea", "file": "Fred again.. feat. The Blessed Madonna - Marea (We’ve Lost Dancing) (Official Audio).mp3", "artist": "Fred again.. & The Blessed Madonna", "title": "Marea (We've Lost Dancing)", "tier": 2,
+      "published": { "bpm": 123, "key": "F minor", "length": "4:45" }, "status": "ok" },
+    { "id": "calvin-feel-so-close", "file": "Calvin Harris - Feel So Close (Lyrics).mp3", "artist": "Calvin Harris", "title": "Feel So Close", "tier": 2,
+      "published": { "bpm": 128, "key": null, "length": "3:45" }, "received": "lyric-video upload, 3:27", "status": "ok" },
+    { "id": "skrillex-rumble", "file": "Skrillex, Fred again.. & Flowdan - Rumble [Official Audio].mp3", "artist": "Skrillex, Fred again.. & Flowdan", "title": "Rumble", "tier": 2,
+      "published": { "bpm": 140, "key": "G♭ minor", "length": "2:26" }, "status": "ok" },
+
+    { "id": "kelly-since-u-been-gone", "file": "Kelly Clarkson - Since U Been Gone.mp3", "artist": "Kelly Clarkson", "title": "Since U Been Gone", "tier": "v7",
+      "published": { "bpm": 131, "key": "G major", "length": null }, "v7": { "drops": ["0:44 hit", "1:32 hit", "2:12 drop"], "lufs": -8.7 }, "status": "ok" },
+    { "id": "bieber-beauty-and-a-beat", "file": "Justin Bieber - Beauty And A Beat ft. Nicki Minaj (Official Audio).mp3", "artist": "Justin Bieber ft. Nicki Minaj", "title": "Beauty And A Beat", "tier": "v7",
+      "published": { "bpm": 128, "key": "C major", "length": null }, "v7": { "drops": ["0:08 drop", "1:00 hit", "2:15 hit"], "lufs": -14.0 }, "status": "ok" },
+    { "id": "john-where-you-are", "file": "John Summit & Hayla - Where You Are (Lyric Visualizer).mp3", "artist": "John Summit & Hayla", "title": "Where You Are", "tier": "v7",
+      "published": { "bpm": 126, "key": "A minor", "length": null }, "v7": { "drops": ["0:17", "1:03", "1:33", "3:05"] }, "status": "ok" },
+    { "id": "drake-pipe-down", "file": "Drake - Pipe Down (Audio).mp3", "artist": "Drake", "title": "Pipe Down", "tier": "v7",
+      "published": { "bpm": 77.5, "key": "C♯ minor", "length": null }, "status": "ok" },
+    { "id": "rihanna-where-have-you-been", "file": "Rihanna - Where Have You Been (Audio).mp3", "artist": "Rihanna", "title": "Where Have You Been", "tier": "extra",
+      "published": { "bpm": null, "key": null, "length": null }, "status": "ok" },
+    { "id": "troye-rush", "file": "Troye Sivan - Rush (Official Video).mp3", "artist": "Troye Sivan", "title": "Rush", "tier": "extra",
+      "published": { "bpm": null, "key": null, "length": null }, "received": "video version, 124 kbps", "status": "low-bitrate" }
+  ],
+  "pairs": [
+    { "a": "fisher-losing-it", "b": "maup-drugs", "tests": "Tech-house standard: same tempo, bass-return drops. Should produce double drops and drop swaps." },
+    { "a": "maup-drugs", "b": "lake-turn-off-the-lights", "tests": "Into a vocal track at the same tempo: the one-voice rules on house." },
+    { "a": "avicii-levels", "b": "garrix-animals", "tests": "Riser drop into silence drop at 126 to 128: fake-out and silence switch." },
+    { "a": "garrix-animals", "b": "shm-dont-you-worry-child", "tests": "Instrumental into vocal anthem at 128 to 129." },
+    { "a": "deadmau5-strobe", "b": "prydz-opus", "tests": "Long progressive builds: build into build, long blends." },
+    { "a": "john-where-you-are", "b": "peggygou-nanana", "tests": "Melodic house, a 3% stretch." },
+    { "a": "domdolla-girls", "b": "fisher-losing-it", "tests": "A 7% tempo gap: the beatmatch edge, ramps and tempo ride." },
+    { "a": "rihanna-where-have-you-been", "b": "calvin-feel-so-close", "tests": "EDM-pop crossover from the same producer." },
+    { "a": "disclosure-latch", "b": "fred-marea", "tests": "Vocal-heavy into no drop: the fallback landings." },
+    { "a": "skrillex-rumble", "b": "garrix-animals", "tests": "No beatmatch possible: echo, wash and tape stop into a big-room drop." }
+  ],
+  "referencePairs": {
+    "about": "The pairs v7 was verified on (02-status, 2026-10-05). Compatibility must reproduce exactly; it comes straight from web/js/mix.js.",
+    "pairs": [
+      { "a": "kelly-since-u-been-gone", "b": "bieber-beauty-and-a-beat", "v7": { "compat": 87, "previewAvg": [98, 92, 99] } },
+      { "a": "john-where-you-are", "b": "bieber-beauty-and-a-beat", "v7": { "compat": 89, "previewAvg": [97, 95, 92] } },
+      { "a": "kelly-since-u-been-gone", "b": "drake-pipe-down", "v7": { "compat": 73, "previewAvg": [95, 95, 92] } },
+      { "a": "demo:0", "b": "demo:1", "v7": { "compat": 93, "ideas": [8, 8, 4], "previewAvg": [98, 100, 96] } }
+    ]
+  }
+}
