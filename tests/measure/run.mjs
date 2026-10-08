@@ -33,6 +33,10 @@ async function loadDeck(page, i, id) {
 
 async function measurePair(browser, base, a, b) {
   const page = await browser.newPage();
+  // Harness-only: the Visuals page keeps a WebGL animation running behind the Mix tab, which costs about half a CPU
+  // in headless Chromium. Throttle requestAnimationFrame to ~4 fps. Mix analysis (setTimeout chunks) and preview
+  // rendering (OfflineAudioContext) don't use it, so measured results are unaffected; the product code is untouched.
+  await page.addInitScript(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`${base}/?debug`);
