@@ -40,7 +40,7 @@ async function measurePair(browser, base, a, b) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`${base}/?debug`);
-  await page.waitForFunction(() => !!window.__mx);
+  await page.waitForFunction(() => !!window.__mx, null, { timeout: 120e3 });
   await page.click('#tab-mix');
   await loadDeck(page, 0, a);
   await page.waitForFunction(() => window.__mx.decks[0] && window.__mx.decks[0].status !== 'loading', null, { timeout: ANALYZE_TIMEOUT, polling: 500 });

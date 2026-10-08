@@ -5,8 +5,9 @@
 
    Measurements (50 ms frames unless noted):
    - phaseMs       beat alignment where both tracks are audible and rhythmic: each solo's onset envelope (10 ms)
-                   folded onto Track 2's 8th-note grid; the circular-mean offset between the two (ms). null when
-                   either track isn't rhythmic enough during the overlap to tell.
+                   folded onto Track 2's 16th-note grid (kicks, snares and hats all land on it, so they reinforce
+                   instead of cancelling, which they did on an 8th-note grid); the circular-mean offset between the
+                   two (ms). Blind to whole-16th slips. null when either track isn't rhythmic enough to tell.
    - twoBass       seconds where both solos' lows (< 120 Hz) are within 6 dB of their own full level.
    - bothFull      seconds where both solos are within 3 dB of their own full level.
    - vocalClash    seconds where both tracks are singing (the profile's vocal curve at each deck's song time
@@ -59,7 +60,7 @@
   function gridPhase(on, t0, t1, T) {
     let c = 0, s = 0, w = 0;
     for (let f = Math.max(1, Math.floor(t0 / 0.01)); f < Math.min(on.length, Math.floor(t1 / 0.01)); f++) {
-      const d = Math.max(0, Math.pow(10, on[f] / 20) - Math.pow(10, on[f - 1] / 20)); if (!d) continue;
+      const rise = on[f] - on[f - 1], d = rise > 3 ? rise : 0; if (!d) continue;   // rises > 3 dB in 10 ms: hits, not sustained sound
       const a = 2 * Math.PI * ((f * 0.01) % T) / T; c += d * Math.cos(a); s += d * Math.sin(a); w += d;
     }
     return w ? { phase: Math.atan2(s, c), strength: Math.hypot(c, s) / w } : { phase: 0, strength: 0 };
@@ -81,7 +82,8 @@
       if (A.lo[f] >= ref[0].lo - 6 && B.lo[f] >= ref[1].lo - 6) twoBass += HOP;
       const fullA = A.full[f] >= ref[0].full - 3, fullB = B.full[f] >= ref[1].full - 3;
       if (fullA && fullB) bothFull += HOP;
-      const audA = A.full[f] >= ref[0].full - 12, audB = B.full[f] >= ref[1].full - 12;
+      // audible: within 20 dB of its own full level (a deck brought in highs-only sits 10-15 dB under its full level)
+      const audA = A.full[f] >= ref[0].full - 20, audB = B.full[f] >= ref[1].full - 20;
       if (audA && audB) bothOn.push(t);
       const sing = [0, 1].map((k) => vocAt(P[k], M.songTime(plan.decks[k], t)) > 0.35 && S[k].mid[f] >= ref[k].mid - 10);
       if (sing[0] && sing[1]) vocalClash += HOP;
@@ -112,14 +114,15 @@
     let arrive = null; for (let f = 0; f < F; f++) if (B.lo[f] >= ref[1].lo - 6) { arrive = f * HOP; break; }
     const arriveJump = arrive != null && arrive > barB ? meanDb(X.lo, arrive, arrive + barB) - meanDb(X.lo, arrive - barB, arrive) : null;
     // beat phase over the overlap, on Track 2's 8th-note grid in preview time
-    let phaseMs = null;
+    let phaseMs = null, phaseFit = null;
     if (bothOn.length * HOP >= 2 && C.B.grid) {
       const clipB = plan.decks[1].clips.find((c) => c.at <= bothOn[0] + 0.01 && c.at + c.dur > bothOn[0]) || plan.decks[1].clips[0];
-      const T = (C.B.grid.beat / ((clipB && clipB.rate) || 1)) / 2, t0 = bothOn[0], t1 = bothOn[bothOn.length - 1] + HOP;
+      const T = (C.B.grid.beat / ((clipB && clipB.rate) || 1)) / 4, t0 = bothOn[0], t1 = bothOn[bothOn.length - 1] + HOP;
       const pa = gridPhase(A.on, t0, t1, T), pb = gridPhase(B.on, t0, t1, T);
+      phaseFit = [pa.strength, pb.strength, t0, t1];
       if (pa.strength > 0.25 && pb.strength > 0.25) { let d = pa.phase - pb.phase; d = Math.atan2(Math.sin(d), Math.cos(d)); phaseMs = Math.abs(d) / (2 * Math.PI) * T * 1000; }
     }
-    return { overlap: bothOn.length * HOP, phaseMs, twoBass, bothFull, vocalClash, hardCuts, fxCuts, midLine, dead, lufsBefore, lufsAfter, step: lufsBefore != null && lufsAfter != null ? lufsAfter - lufsBefore : null, peak: X.peak, landJump, arriveJump };
+    return { overlap: bothOn.length * HOP, phaseMs, phaseFit, twoBass, bothFull, vocalClash, hardCuts, fxCuts, midLine, dead, lufsBefore, lufsAfter, step: lufsBefore != null && lufsAfter != null ? lufsAfter - lufsBefore : null, peak: X.peak, landJump, arriveJump };
   }
 
   // The harness score (0-100). Rebuilt for the repo on 2026-10-08: the v7 session's meas_page.js scoring rule was not
