@@ -8,6 +8,7 @@
 //   node tests/measure/run.mjs --reference          the v7 reference pairs (incl. the demo pair)
 //   node tests/measure/run.mjs a-id:b-id ...        specific pairs ("demo:0" and "demo:1" are the demo songs)
 //   --jobs N    pairs measured in parallel (default 1; each runs its own browser page)
+//   --table     don't measure; rebuild the summary table from the saved results for the chosen pairs
 //
 // Needs: npm install (playwright) and `npx playwright install chromium` once.
 // Writes tests/out/pairs/<a>__<b>.json and tests/out/pairs.md.
@@ -96,6 +97,9 @@ if (args.includes('--reference')) pairs = manifest.referencePairs.pairs.map((p) 
 else if (args.some((x) => x.includes(':') && !x.startsWith('--'))) pairs = args.filter((x) => !x.startsWith('--')).map((x) => { const m = x.match(/^(demo:\d|[^:]+):(demo:\d|[^:]+)$/); return [m[1], m[2]]; });
 else pairs = manifest.pairs.flatMap((p) => args.includes('--one-way') ? [[p.a, p.b]] : [[p.a, p.b], [p.b, p.a]]);
 
+if (!args.includes('--table')) await runAll();
+
+async function runAll() {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 // two pages run side by side, so stop Chromium from throttling timers in whichever one it considers in the background
@@ -112,6 +116,7 @@ const worker = async () => {
 };
 await Promise.all(Array.from({ length: Math.min(jobs, pairs.length) }, worker));
 await browser.close(); server.close();
+}
 
 // the table covers every result file present for the pairs asked for
 const rows = pairs.map(([a, b]) => join(OUT, `${a.replace(':', '')}__${b.replace(':', '')}.json`)).filter(existsSync).map((f) => summarize(JSON.parse(readFileSync(f, 'utf8'))));
