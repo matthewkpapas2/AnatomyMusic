@@ -30,6 +30,6 @@ export function demoAudio(id, sr = 44100) {
 }
 
 // --- small formatting helpers shared by the reports -------------------------
-export const mmss = (t) => t == null ? '—' : `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+export const mmss = (t) => { if (t == null) return '—'; const r = Math.round(t); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
 export const keyName = (k) => k == null || k < 0 ? '—' : Engine.keyName(k);
 export const pct = (v) => v == null ? '—' : Math.round(v * 100);
