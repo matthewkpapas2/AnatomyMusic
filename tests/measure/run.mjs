@@ -27,11 +27,13 @@ async function loadDeck(page, i, id) {
   if (id.startsWith('demo:')) { await page.evaluate(([i, w]) => window.__mx.loadDemo(i, w), [i, Number(id.slice(5))]); return; }
   const s = song(id);
   if (!s.present) throw new Error(`missing audio for ${id}: ${s.path}`);
-  const chooser = page.waitForEvent('filechooser');
-  await page.locator(`#deck-${i} button`, { hasText: /Choose a file|Replace|Try another file/ }).first().click();
+  // Wait for the chooser and click together: a chooser promise left waiting when the click fails rejects with nothing
+  // listening, and that crashed the whole run (2026-10-09). 60 s: two pages share the 2-core workspace.
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 60e3 }),
+    page.locator(`#deck-${i} button`, { hasText: /Choose a file|Replace|Try another file/ }).first().click({ timeout: 60e3 })]);
   // Hand the file over as bytes under its real name: given a path with a non-ASCII character (Marea's curly apostrophe),
   // Playwright's file chooser silently delivered nothing and the run hung. The page still sees the real filename.
-  await (await chooser).setFiles({ name: s.file, mimeType: 'audio/mpeg', buffer: readFileSync(s.path) });
+  await chooser.setFiles({ name: s.file, mimeType: 'audio/mpeg', buffer: readFileSync(s.path) });
   await page.waitForFunction((i) => !!window.__mx.decks[i], i, { timeout: 30e3, polling: 250 })
     .catch(() => { throw new Error(`the file for ${id} never reached the page`); });
 }
