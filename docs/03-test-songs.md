@@ -1,6 +1,6 @@
 # Anatomy: test song set (v8, platform phase)
 
-_Created 2026-10-07; measured 2026-10-08. Matt downloads the songs; the analysis runs on them. Tempo, key and length
+_Created 2026-10-07; measured 2026-10-08; versions rechecked 2026-10-09. Matt downloads the songs; the analysis runs on them. Tempo, key and length
 are as published (Beatport for DJ versions, songbpm.com otherwise). Anatomy measures its own values, and disagreements
 are part of the test. In the repo, the machine-readable list is `tests/songs.manifest.json`._
 
@@ -54,7 +54,11 @@ a synth lead around a short vocal sample, so the detector is reading lead synths
 matters for transitions: the one-voice floors then block Intermediate and Advanced ideas on instrumental house, too.
 
 ### Timestamps to check by ear
-Write down every drop you hear, including ones missing here, to the nearest second.
+Write down every drop you hear, including ones missing here, to the nearest second. They go in the manifest as
+`"ear": ["m:ss", …]` per song (`[]` = listened, no drop), and `npm run test:ear` scores the detector against them:
+hits, misses, false drops, timing in beats and which rule failed (`docs/testing.md` 3b). **Status 2026-10-09: not
+received yet.** Also worth an ear: Rihanna 1:31 and Animals 1:07 (gap-only entries that used to be landings; is either a
+drop or chorus hit?), and Pipe Down 0:06 / 0:12 (where does the beat come in?).
 
 **Check first (the detector is least sure, or the result is surprising):**
 1. **Opus:** 2:00, 3:10, 4:00. Only low-confidence chorus-type hits, no full drop. Is there a real drop in this radio edit, and where?
@@ -80,7 +84,7 @@ Write down every drop you hear, including ones missing here, to the nearest seco
 - Beauty And A Beat: 0:08, 1:01 (hit), 2:16 (hit)
 - Where You Are: 0:17, 1:03, 1:33, 3:05
 
-## Received 2026-10-08: version check (unchanged on 2026-10-08 evening)
+## Received 2026-10-08: version check (unchanged on 2026-10-08 evening and 2026-10-09)
 All 14 songs arrived. Lengths and bitrates were checked with ffprobe; "published length" is the length of the DJ
 version. **#1, #2 and #5 are still the short versions** (rechecked: 4:09, 2:26 and 5:28), and Strobe (10:37) is longer
 than the Mix tab's 600 s cap, so only its first 10:00 is analyzed.
@@ -102,7 +106,7 @@ than the Mix tab's 600 s cap, so only its first 10:00 is analyzed.
 | 13 | Calvin Harris – Feel So Close (Lyrics) | 3:27 | 192 | Usable. This is the lyric-video upload, shorter than the 3:45 listed. |
 | 14 | Skrillex, Fred again.. & Flowdan – Rumble | 2:27 | 192 | OK |
 
-**Next step for Matt:** re-download #1, #2 and #5 as the Extended or Original Mix. Until then, the radio edits are
+**Rechecked 2026-10-09 with ffprobe:** still 4:08, 2:26 and 5:27, the same files. **Next step for Matt:** re-download #1, #2 and #5 as the Extended or Original Mix. Until then, the radio edits are
 fine for testing the drop detector but not for testing transitions.
 
 ## Why these songs

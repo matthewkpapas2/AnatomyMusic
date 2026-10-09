@@ -1,6 +1,6 @@
 # Anatomy: project overview
 
-_Last updated: 2026-10-08 (v8 platform scaffold; app code still v7). Read this first in any new Anatomy session._
+_Last updated: 2026-10-09 (v8: the first code changes, Fake-out and gap-only landings, are PRs stacked on the scaffold). Read this first in any new Anatomy session._
 
 ## What it is
 Anatomy is a web app that listens to sound in the browser and shows it three ways:
@@ -38,6 +38,8 @@ itself still has no build step and no dependencies apart from Google Fonts, and 
   (these docs, plus `testing.md` and the results). See `01-architecture.md`.
 - **Matt's Mac, `~/Downloads/`:** `anatomy.html` … `anatomy7.html`, kept as they are (never overwritten). `anatomy7.html`
   is the v7 the repo was split from (sha256 `4081c8c1…b14b`). `anatomy-tab-2026-09-24-18-24.png` is an exported Song DNA card.
+  `anatomy-v7-workspace.tar.gz` (Oct 8, 4:09 PM) is the v7 session's work folder after all: the v7 harness (`run.js`,
+  `meas_page.js`), `ui_smoke.js`, `shots.js`, v7's raw results and the parked `lyr.js`. Not ported (a decision for Matt, see `02`).
 - **Test songs in `~/Downloads`:** the 20 songs in `03-test-songs.md` (14 house/EDM test songs plus Kelly, Bieber,
   John Summit, Drake, Rihanna and Troye Sivan). Three are still the wrong (short) versions. They are listed by filename
   in `tests/songs.manifest.json`; no audio is ever committed.
@@ -45,13 +47,15 @@ itself still has no build step and no dependencies apart from Google Fonts, and 
   2026-10-08 (tech debt #30). Edit the repo copy, then copy to the Project in the same session.
 
 ## How to pick this up in a new session
-1. Read these docs: `00-overview`, `01-architecture`, `02-status-and-roadmap`, and the latest `04-results-*`.
+1. Read these docs: `00-overview`, `01-architecture`, `02-status-and-roadmap`, `testing`, and the latest `04-results-*`.
 2. Attach the repo (`matthewkpapas2/AnatomyMusic`, push access; the Claude GitHub App is installed on it) and clone it.
-3. Run `npm test` before changing anything (byte identity while web/ is still v7, server tests, the demo regression).
+3. Run `npm test` before changing anything (the single-file build, server tests, the demo regression). Then measure:
+   the harness baseline must match the latest results doc before a change is judged against it.
 4. If the session is linked to Matt's computer, stage the songs from `~/Downloads` and set `ANATOMY_SONGS` (or
-   `tests/songs.local.json`), then `npm run test:songs` / `npm run test:pairs` as needed. In the cloud workspace,
+   `tests/songs.local.json`), then `npm run test:songs` / `npm run test:ear` / `npm run test:pairs` as needed. In the cloud workspace,
    `npm i` is replaced by symlinking `/opt/npm-tools/node_modules/playwright{,-core}` into `node_modules/`.
-5. After a meaningful change: a branch, small described commits, a PR; update `02` and the results doc.
+5. After a meaningful change: a branch, small described commits, a PR; update `02` and the results doc. While PR #1
+   is open, new PRs stack on it (each targets the branch before it). Use `gh api` (REST); GraphQL is blocked from these sessions.
 
 ## Working rules (Matt wants these explicit)
 - **No silent technical debt.** Say any workaround or duplicate in the reply *and* log it in the status doc. **Remove dead code instead of leaving it dormant.** Pipeline stages get scripts when they're built, not as empty stubs.

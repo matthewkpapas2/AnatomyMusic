@@ -1,10 +1,11 @@
 # Testing
 
-Five layers, from fastest to slowest. Run the first one before every commit that touches `web/`.
+Five layers, from fastest to slowest. Run the first one before every commit that touches `web/`, and the harness
+before and after every change to `web/js/mix.js` (the baseline must first reproduce the latest results doc).
 
 | Command | What it proves | Needs |
 |---|---|---|
-| `npm test` | `web/` inlines back to anatomy7.html byte for byte; server routes; engine + mixer regression on the demo songs | Node ≥ 20.12 |
+| `npm test` | `web/` still inlines into one file; server routes; engine + mixer regression on the demo songs | Node ≥ 20.12 |
 | `npm run test:songs` | Tempo, key and drops for every song in the manifest, against published values | ffmpeg, the songs |
 | `npm run test:ear` | `findDrops` against Matt's by-ear drop marks (`ear` in the manifest): hits, misses, false drops, timing in beats, which rule failed | same |
 | `npm run test:pairs` | Every suggested idea on the 10 test pairs (both directions), rendered and measured | Playwright Chromium, the songs |
@@ -17,11 +18,12 @@ hardcoded `/home/claude/...` paths. The folder is resolved in this order: `$ANAT
 `tests/songs.local.json` (`{"dir": "~/Downloads"}`, gitignored), then `~/Downloads`. No audio is ever committed:
 `.gitignore` blocks mp3, wav, aiff, flac, m4a, ogg, opus and webm.
 
-## 1. The byte-identity check (`tools/build-single.mjs --check`)
-web/ is anatomy7.html cut along its existing block boundaries. Inlining the stylesheet and the four scripts must give
-back a file whose sha256 is `4081c8c1…b14b` (anatomy7.html, 460,115 bytes). **When web/ starts changing on purpose (v8
-features), this check retires.** Replace it with the regression and harness baselines, and record the last commit
-where it passed.
+## 1. The byte-identity check (retired 2026-10-09)
+web/ began as anatomy7.html cut along its existing block boundaries, and `tools/build-single.mjs --check` proved that
+inlining the stylesheet and the four scripts gave back sha256 `4081c8c190069791cdb411955dc36d12738086abe2dec412c0900b97c542b14b`
+(anatomy7.html, 460,115 bytes). It retired with the first intentional web/ change (the Fake-out fix). **It last passed at
+`e5a8f9d`** (platform-scaffold) and on `102dc8f` (ear-vs-detector, which doesn't touch web/). The regression checks and
+the harness baselines (`04-results-*`) replace it. `npm test` still runs the inliner, so the single-file build keeps working.
 
 ## 2. Regression (`tests/regression.mjs`)
 The v7 checks on the two synthesized demo songs, which have known answers: tempo, beat grid error (< 1 ms), section
@@ -82,7 +84,11 @@ cut, 4 per mid-line entry, 30/s of dead air over 0.5 s, 5/LU landing more than 1
 10 for a peak over −0.3 dBFS, 3/s of both songs at full level beyond 4 s, and 3/dB when the drop adds less than 3 dB of
 bass. Scores are comparable with each other, **not one-for-one with the v7 table**.
 
-The harness throttles `requestAnimationFrame` to 4 fps (an init script) because the Visuals animation behind the Mix
-tab costs about half a CPU headless. Analysis and preview rendering don't use it.
+The harness opens `?debug#mix` straight away. (Until 2026-10-09 it opened on Visuals, which draws WebGL in software
+headless at about one full CPU, and patched `requestAnimationFrame` to cope; the Visuals animation only runs while its
+page shows, so neither is needed. Removing both changed no idea, cue or score.) Two pages run in parallel (`--jobs 2`)
+on the 2-core cloud workspace; under extra load a deck button click can time out after 30 s (one direction per run on
+2026-10-09). Re-run that direction on its own (`node tests/measure/run.mjs a:b`); results are deterministic to about
+1e-5 dB, so a re-run is comparable.
 
 Output: `tests/out/pairs/<a>__<b>.json` (everything, per idea) and `tests/out/pairs.md` (the summary table).
