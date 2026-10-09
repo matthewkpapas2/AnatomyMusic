@@ -42,15 +42,12 @@ async function measurePair(browser, base, a, b) {
 }
 
 async function measureOn(page, a, b, base) {
-  // Harness-only: the Visuals page keeps a WebGL animation running behind the Mix tab, which costs about half a CPU
-  // in headless Chromium. Throttle requestAnimationFrame to ~4 fps. Mix analysis (setTimeout chunks) and preview
-  // rendering (OfflineAudioContext) don't use it, so measured results are unaffected; the product code is untouched.
-  await page.addInitScript(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
+  // Open straight on the Mix page. The Visuals page (the default) draws WebGL in software when headless, about one
+  // full CPU; the Visuals animation only runs while its page is showing, so starting on Mix avoids it entirely.
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`${base}/?debug`);
-  await page.waitForFunction(() => !!window.__mx, null, { timeout: 120e3, polling: 250 });   // timer polling: rAF is throttled above
-  await page.click('#tab-mix');
+  await page.goto(`${base}/?debug#mix`);
+  await page.waitForFunction(() => !!window.__mx, null, { timeout: 120e3, polling: 250 });
   await loadDeck(page, 0, a);
   await page.waitForFunction(() => window.__mx.decks[0] && window.__mx.decks[0].status !== 'loading', null, { timeout: ANALYZE_TIMEOUT, polling: 500 });
   await loadDeck(page, 1, b);
