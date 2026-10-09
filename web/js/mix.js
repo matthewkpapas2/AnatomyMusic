@@ -837,6 +837,19 @@ const AnatomyMix = (() => {
   // the DJ's oldest drop trick: Track 1's bass knob all the way down for the last beat (or bar) before the drop, so
   // the drop has an empty low end to land in. One EQ move, so it's fine at any level.
   function bassOut(C, a, at, beats) { const t = at - beats * C.beatA; a.lo.push([0, 1], [t - 0.012, 1], [t, 0]); return t; }
+  // v8: how loud a stretch of a song is in the mids and highs (what an echo repeats, and what you hear in a build), as
+  // power relative to the song's median
+  const midHiMed = new WeakMap();
+  function midHi(P, t0, t1) {
+    const f = P.feat; if (!f) return 1;
+    if (!midHiMed.has(P)) { const v = []; for (let i = 0; i < f.eMid.length; i += 16) v.push(f.eMid[i] + f.eHi[i]); v.sort((x, y) => x - y); midHiMed.set(P, v[v.length >> 1] || 1e-12); }
+    const a = Math.max(0, Math.floor(t0 / f.hop)), b = Math.min(f.eMid.length, Math.ceil(t1 / f.hop)); let s = 0; for (let i = a; i < b; i++) s += f.eMid[i] + f.eHi[i];
+    return b > a ? s / (b - a) / midHiMed.get(P) : 0;
+  }
+  // beats of silence right before t (up to 3): each more than 10 dB under the loudest of the three beats before it
+  function hushBeats(P, t, beat) { let n = 0; while (n < 3) { const k = t - (n + 1) * beat, ref = Math.max(midHi(P, k - beat, k), midHi(P, k - 2 * beat, k - beat), midHi(P, k - 3 * beat, k - 2 * beat)); if (!(midHi(P, k, k + beat) < 0.1 * ref)) break; n++; } return n; }
+  // the longest lead-in of at most `bars` bars before t (and at least 2) that has no beat 20 dB under the song's median
+  function soundingBars(P, t, bars) { const g = P.grid; if (!g) return bars; for (let j = 2; j < bars; j++) { const b0 = t - (j + 1) * g.bar; for (let q = 0; q < 4; q++) if (midHi(P, b0 + q * g.beat, b0 + (q + 1) * g.beat) < 0.01) return j; } return bars; }
   const bassStep = (beats, at) => beats >= 4 ? `For the last bar before the switch (from ${at}), turn ${T1}'s bass all the way down: the drop lands in an empty low end.` : `On the last beat before the switch, kill ${T1}'s bass: the drop lands in an empty low end.`;
   // a quick look at how a candidate will score, using the same sound check and payoff as the final ranking
   function rate(C, x) { const ck = soundCheck(C, x), L = x.landing; const lv = L ? clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : L.kind === 'gap' ? 0.3 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0)) : 0.3; const pay = clamp(0.4 * lv + 0.25 * (x.tension || 0.5) + 0.35 * clamp((ck.contrast || 0) / 12)); return { ck, pay, total: 0.55 * ck.total + 0.45 * pay }; }
@@ -1218,12 +1231,20 @@ const AnatomyMix = (() => {
     if (!Os.length) return { skip: `${T1} has no build-up into a drop to fake out.` };
     if (!Ls.length) return { skip: `${T2} has no drop early enough to land on.` };
     const cands = [];
-    for (const o of Os) for (const L of Ls) {
-      const preBars = clamp(o.drop.buildBars + 1, 2, 9), pre = preBars * bar, tLand = pre + bar, plan = newPlan(tLand + barsB(C, 6)), a = plan.decks[0], b = plan.decks[1];
-      clip(a, 0, o.t - pre, pre + 0.05); a.echoTime = beat; a.echo.push([0, 0], [pre - beat - 0.02, 0], [pre - beat, 0.85], [tLand, 0.85], [tLand + 0.01, 0]); a.gain.push([0, 1], [pre - 0.012, 1], [pre, 0]);
-      landB(C, b, tLand, L.t, plan.len - tLand, LEAD(C, L), a); b.shift = C.beatmatch ? bestShift(C, keyAt(A, o.t - 1), keyAt(B, L.t + 1)) : 0;
+    // v8: the preview starts after any near-silence in Track 1's build (Drugs From Amsterdam's build opens with a fade
+    // to almost nothing), and the echo repeats the last beat that has sound in it (Demo 1's build ends in a one-beat
+    // silence, which the echo used to repeat into a 2-second hole). Echo feedback of one half still fades about 24 dB
+    // over the bar, so with matched tempos a second version plays Track 2's last build bar (bass off) under the echoes;
+    // it brings Track 2 in a bar early, which the voice check may not allow, so the sound check picks between the two.
+    for (const o of Os) for (const L of Ls) for (const fill of C.beatmatch ? [false, true] : [false]) {
+      const preBars = soundingBars(A, o.t, clamp(o.drop.buildBars + 1, 2, 9)), pre = preBars * bar, tLand = pre + bar, plan = newPlan(tLand + barsB(C, 6)), a = plan.decks[0], b = plan.decks[1];
+      const hush = hushBeats(A, o.t, beat), tOut = pre - hush * beat;
+      clip(a, 0, o.t - pre, pre + 0.05); a.echoTime = beat; a.echo.push([0, 0], [tOut - beat - 0.02, 0], [tOut - beat, 0.85], [tLand, 0.85], [tLand + 0.01, 0]); a.gain.push([0, 1], [tOut - 0.012, 1], [tOut, 0]);
+      if (fill) { clip(b, pre, L.t - bar * C.rB, plan.len - pre, C.rB); b.gain.push([pre, 0], [pre + 0.5 * bar, 1]); b.lo.push([pre, 0], [tLand - 0.012, 0], [tLand, 1]); }
+      else landB(C, b, tLand, L.t, plan.len - tLand, LEAD(C, L), a);
+      b.shift = C.beatmatch ? bestShift(C, keyAt(A, o.t - 1), keyAt(B, L.t + 1)) : 0;
       mark(plan, pre, `${T1}'s drop… doesn't come`); mark(plan, tLand, `${T2}'s drop`);
-      const x = landed({ tech: 'fakeout', cueA: o.t, cueB: L.t, sync: C.beatmatch ? 'match' : null, shift: b.shift, plan }, tLand, L, 1);
+      const x = landed({ tech: 'fakeout', cueA: o.t, cueB: L.t, sync: C.beatmatch ? 'match' : null, shift: b.shift, plan, hush, fill }, tLand, L, 1);
       x.score = 0.35 * keyFit(keyAt(A, o.t - 1), keyAt(B, L.t + 1)) + 0.35 * late(A, o.t) + 0.3 * clamp(o.drop.buildBars / 8); x.o = o; x.r = rate(C, x); cands.push(x);
     }
     return best2(cands, (k, c) => near(k.cueA, c.cueA, 8)).slice(0, 1).map(x => {
@@ -1231,7 +1252,11 @@ const AnatomyMix = (() => {
       return Object.assign(x, {
         title: `Fake-out: ${T1}'s drop never comes, ${T2}'s lands a bar late`,
         special: `The crowd counts down ${T1}'s build, hits the one, and gets only an echo. A bar later ${T2}'s drop lands, harder for the wait.`,
-        steps: [`Echo on ${T1}: 1 beat, feedback around half, off for now.`, `Cue ${T2} at ${where(B, L.t)}.`, `Let ${T1}'s build-up run from ${fmtTime(o.drop.build0)}. On its last beat, echo on.`, `On the downbeat where its drop should hit (${where(A, o.t)}), pull ${T1}'s fader to zero. Count one full bar of echoes.`, `On the next downbeat, start ${T2}.`],
+        steps: [`Echo on ${T1}: 1 beat, feedback around half, off for now.`,
+          x.fill ? `Cue ${T2} one bar before its drop (${where(B, L.t - barLen(B))}), with its bass EQ off.` : `Cue ${T2} at ${where(B, L.t)}.`,
+          `Let ${T1}'s build-up run from ${fmtTime(o.drop.build0)}.`,
+          x.hush ? `Its last ${x.hush === 1 ? 'beat is' : `${x.hush} beats are`} silent, so echo the beat before: turn the echo on there, and pull ${T1}'s fader to zero as the silence starts.` : `On its last beat, echo on. On the downbeat where its drop should hit (${where(A, o.t)}), pull ${T1}'s fader to zero.`,
+          x.fill ? `On the downbeat where ${T1}'s drop should hit (${where(A, o.t)}), start ${T2}: its last build bar plays under the echoes. One bar later, bring its bass up on the one as its drop lands.` : `Count one full bar of echoes after the downbeat where ${T1}'s drop should hit (${where(A, o.t)}). On the next downbeat, start ${T2}.`],
         why: [tensionWhy(C, o), `Producers call it a "fake drop": withholding the release one bar makes it hit harder. The echoes keep the room from going silent.`, landWhy(C, L)], warn: [`Commit to the full bar. Cutting it short just sounds like a mistake.`], chips: ['1-bar fake-out', 'Lands the drop']
       });
     });
