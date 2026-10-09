@@ -2,19 +2,15 @@
 // Inline web/ back into one self-contained HTML file (the pre-platform format).
 //
 //   node tools/build-single.mjs              -> writes dist/anatomy.html, prints its sha256
-//   node tools/build-single.mjs --check      -> exits 1 unless the output hashes to V7_SHA256
 //
-// The --check mode is the proof that web/ is the v7 page split into files and
-// nothing else: inlining the stylesheet and the four scripts must reproduce
-// anatomy7.html byte for byte. Once web/ starts changing on purpose, the check
-// is retired by moving V7_SHA256 into docs/ history (see docs/testing.md).
+// npm test runs it so the single-file build keeps working (one stylesheet, four scripts).
+// Until 2026-10-09 a --check mode also proved web/ was anatomy7.html byte for byte; it was
+// retired with the first intentional web/ change (docs/testing.md has the hash and the last
+// commit where it passed).
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-// sha256 of ~/Downloads/anatomy7.html as saved on 2026-10-05 (460,115 bytes).
-export const V7_SHA256 = '4081c8c190069791cdb411955dc36d12738086abe2dec412c0900b97c542b14b';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const web = join(root, 'web');
@@ -39,8 +35,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   mkdirSync(join(root, 'dist'), { recursive: true });
   writeFileSync(join(root, 'dist', 'anatomy.html'), out);
   console.log(`dist/anatomy.html  ${Buffer.byteLength(out)} bytes  sha256 ${sha}`);
-  if (process.argv.includes('--check')) {
-    if (sha !== V7_SHA256) { console.error('FAIL: does not match anatomy7.html'); process.exit(1); }
-    console.log('OK: byte-identical to anatomy7.html');
-  }
 }
