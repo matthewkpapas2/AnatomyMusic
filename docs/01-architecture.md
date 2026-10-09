@@ -1,7 +1,7 @@
 # Anatomy: architecture (v7 code in the v8 repo layout)
 
-_Last updated: 2026-10-08. The app code is still exactly v7 (anatomy7.html, 2026-10-05); this session changed the
-layout, not the code. Line numbers refer to the files in `web/`._
+_Last updated: 2026-10-09. The app code is v7 plus the first v8 changes (Fake-out, landings; `docs/02`). Line numbers
+refer to the files in `web/` and drift with each change._
 
 ## Repo layout
 | Path | What | Notes |
@@ -14,8 +14,8 @@ layout, not the code. Line numbers refer to the files in `web/`._
 | `web/js/app.js` | **App** (2,495 lines) | v7 script 4: audio I/O, Analysis drawing, `VZ` visuals, the `MX` Mix UI and preview renderer, tabs, main loop. |
 | `server/index.mjs` | Local server | Node ≥ 20.12, no dependencies, 127.0.0.1 only. Serves `web/`; `GET /api/health`; `POST /api/creative` is a stub (501) for the future Claude call. Reads a gitignored `.env` (`ANTHROPIC_API_KEY`, `PORT`). |
 | `data/` | Dataset pipeline | `download/get_subset.py` (run on the Mac), `pipeline/status.py`, `README.md` with the stage plan. `raw/`, `work/` and `out/` are gitignored. |
-| `tests/` | Test suite | `regression.mjs`, `profile-songs.mjs`, `measure/` (preview harness), `unit/` (server), `lib/`, `songs.manifest.json`. See `docs/testing.md`. |
-| `tools/build-single.mjs` | Inlines `web/` into one HTML file | `--check` proves the output is byte-identical to anatomy7.html |
+| `tests/` | Test suite | `regression.mjs`, `profile-songs.mjs`, `drops-vs-ear.mjs` (+ `lib/drop-rules.mjs`), `measure/` (preview harness), `unit/` (server), `lib/`, `songs.manifest.json`. See `docs/testing.md`. |
+| `tools/build-single.mjs` | Inlines `web/` into one HTML file | `npm test` runs it so the single-file build keeps working. The byte-identity `--check` retired on 2026-10-09 |
 
 The four scripts still share one global scope: each is a classic script with a top-level `const` (`AnatomyEngine`,
 `AnatomyDemo`, `AnatomyMix`, then the App IIFE), so later scripts see earlier ones by name. They are **not** `window`
@@ -48,8 +48,9 @@ tab decides". The file input is `#mx-file` (hidden; the deck buttons click it).
    - Riser rule: the highs +8 dB over 4 bars, then −4 dB, while the low end and mids get fuller.
    - A bass return that leads into a riser drop counts as the build's start. At most one drop per 8 bars.
    - Confident drops move a section start within 2.2 bars onto themselves, and `P.phrase.starts` is rebuilt.
-   - **Gap-only entries** (`kind: 'gap'`) carry `conf` 0.30 and `impact` 0. Measured 2026-10-08: on house tracks they
-     fire at 8-bar phrase ends (Animals: 8 of them, every 15.0 s). `landings()` accepts them (tech debt #31).
+   - **Gap-only entries** (`kind: 'gap'`) carry `conf` 0.30 and `impact` 0. On house tracks they fire at 8-bar phrase
+     ends (Animals: 8 of them, every 15.0 s). Since 2026-10-09 `landings()` skips them (#31); they still show as small
+     marks on the waveforms, the Silence switch still uses Track 1's, and `launches()` still treats them as builds (#42).
 
 **`match(A, B)`:** tempo relation, key and best shift, `XS`, LUFS trim; then 22 generators, each through `finish()`
 (sound check, payoff, score). The sound floor (`floorOf(L)` = 0.70 / 0.725 / 0.75) plus a one-voice minimum (0.45 at
@@ -58,9 +59,12 @@ Intermediate, 0.6 at Advanced); failures go to `skipped` with their best score a
 Returns `{ A, B, T, K, trim, XS, warnGrid, ideas, byLevel, skipped, rB, compat }`.
 
 **Landings and launches (v7):**
-- `landings(C)`: Track 2's drops, hits and gaps in its first 72% with ≥ 10 bars left; if none, chorus or peak section starts. `early` marks the first one or any before 35%.
+- `landings(C)`: Track 2's drops and hits (confidence ≥ 0.3) in its first 72% with ≥ 10 bars left. If none of them is
+  confident (≥ 0.6), chorus or peak section starts are added (not before 0.5 s). `early` marks the first one or any before 35%.
 - `launches(C, minFrac)`: Track 1's drops with a build (`kind: 'build'`, tension 1) and its phrase lines (`kind: 'phrase'`, tension 0.5), each with `line` (`lineEnds`).
-- Helpers: `landed`, `rate`, `best2`, `intoDrop`, `bassOut`, `dropBlend`, `landB` (as documented for v7).
+- Helpers: `landed`, `rate`, `best2`, `intoDrop`, `bassOut`, `dropBlend`, `landB` (as documented for v7). v8: `midHi(P, t0, t1)`
+  (mids + highs power against the song's median), `hushBeats` (silent beats right before a time) and `soundingBars`
+  (the longest lead-in without a near-silent beat), used by Fake-out.
 
 **Generators (`TECH` keys):** Level 1 `blend`, `riser`, `cut`, `echo`, `brake`. Level 2 `swap`, `double`, `roll`, `spin`,
 `wash`, `lift`, `layer`, `chord`, `halftime`, `accel`. Level 3 `fakeout`, `escalator`, `hijack`, `wormhole`, `modulate`,
@@ -83,18 +87,19 @@ crossSim, landings, launches, soundCheck, finish, gens()`).
 - Previews (`renderPlan(plan)` → `AudioBuffer` at 44.1 kHz): per deck trim → isolator → HPF → LPF → fader; echo and
   reverb sends tap before the fader; the reverb impulse is generated (`reverbImpulse`); then the JS look-ahead limiter at −0.5 dBFS.
 - Debug: `?debug` exposes `window.__mx = { decks, result, renderPlan, loadDemo, setLevel }`. The harness uses it.
-- The Visuals `requestAnimationFrame` loop keeps running when another tab is showing (it cost ~half a CPU headless).
+- One `requestAnimationFrame` loop drives everything; it calls `VZ.frame` only while Visuals is showing (measured
+  2026-10-09, headless: Visuals ~103% CPU in software WebGL, Mix 4–8%, Analysis 43%). Browsers pause it in background tabs.
 
 ## Test tooling
 All in `tests/` (`docs/testing.md`). The v7 session's work-folder tools (`run.js`, `meas_page.js`, `prof.js`, `v7test.js`,
-`why.js`, `drops_list.js`, `ui_smoke.js`, `shots.js`, `build.py`/`extract.sh`) **were not recovered** (the workspace
-tarball wasn't available on 2026-10-08). What exists now:
+`why.js`, `drops_list.js`, `ui_smoke.js`, `shots.js`, `build.py`/`extract.sh`) weren't available on 2026-10-08. **They
+turned up on 2026-10-09** in `~/Downloads/anatomy-v7-workspace.tar.gz`, but are not ported (a decision for Matt). What exists now:
 
 | v7 tool | Repo replacement |
 |---|---|
-| `build.py` / `extract.sh` | `tools/build-single.mjs` (inline + byte check). The split itself was one-off. |
+| `build.py` / `extract.sh` | `tools/build-single.mjs` (inline). The split itself was one-off. |
 | regression scripts | `tests/regression.mjs` |
-| `prof.js`, `drops_list.js` | `tests/profile-songs.mjs` |
+| `prof.js`, `drops_list.js` | `tests/profile-songs.mjs`; `tests/drops-vs-ear.mjs` for drops against Matt's ear marks |
 | `run.js` + `meas_page.js` | `tests/measure/run.mjs` + `meas_page.js`, **rebuilt with a new, documented score rule** |
 | `why.js` | not rebuilt (the harness JSON keeps every skipped idea and its reason) |
 | `ui_smoke.js`, `shots.js` | not rebuilt yet (tech debt #33) |
