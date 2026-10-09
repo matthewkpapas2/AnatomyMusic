@@ -27,11 +27,13 @@ async function loadDeck(page, i, id) {
   if (id.startsWith('demo:')) { await page.evaluate(([i, w]) => window.__mx.loadDemo(i, w), [i, Number(id.slice(5))]); return; }
   const s = song(id);
   if (!s.present) throw new Error(`missing audio for ${id}: ${s.path}`);
-  const chooser = page.waitForEvent('filechooser');
-  await page.locator(`#deck-${i} button`, { hasText: /Choose a file|Replace|Try another file/ }).first().click();
+  // Wait for the chooser and click together: a chooser promise left waiting when the click fails rejects with nothing
+  // listening, and that crashed the whole run (2026-10-09). 60 s: two pages share the 2-core workspace.
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 60e3 }),
+    page.locator(`#deck-${i} button`, { hasText: /Choose a file|Replace|Try another file/ }).first().click({ timeout: 60e3 })]);
   // Hand the file over as bytes under its real name: given a path with a non-ASCII character (Marea's curly apostrophe),
   // Playwright's file chooser silently delivered nothing and the run hung. The page still sees the real filename.
-  await (await chooser).setFiles({ name: s.file, mimeType: 'audio/mpeg', buffer: readFileSync(s.path) });
+  await chooser.setFiles({ name: s.file, mimeType: 'audio/mpeg', buffer: readFileSync(s.path) });
   await page.waitForFunction((i) => !!window.__mx.decks[i], i, { timeout: 30e3, polling: 250 })
     .catch(() => { throw new Error(`the file for ${id} never reached the page`); });
 }
@@ -42,15 +44,12 @@ async function measurePair(browser, base, a, b) {
 }
 
 async function measureOn(page, a, b, base) {
-  // Harness-only: the Visuals page keeps a WebGL animation running behind the Mix tab, which costs about half a CPU
-  // in headless Chromium. Throttle requestAnimationFrame to ~4 fps. Mix analysis (setTimeout chunks) and preview
-  // rendering (OfflineAudioContext) don't use it, so measured results are unaffected; the product code is untouched.
-  await page.addInitScript(() => { window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 250); });
+  // Open straight on the Mix page. The Visuals page (the default) draws WebGL in software when headless, about one
+  // full CPU; the Visuals animation only runs while its page is showing, so starting on Mix avoids it entirely.
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`${base}/?debug`);
-  await page.waitForFunction(() => !!window.__mx, null, { timeout: 120e3, polling: 250 });   // timer polling: rAF is throttled above
-  await page.click('#tab-mix');
+  await page.goto(`${base}/?debug#mix`);
+  await page.waitForFunction(() => !!window.__mx, null, { timeout: 120e3, polling: 250 });
   await loadDeck(page, 0, a);
   await page.waitForFunction(() => window.__mx.decks[0] && window.__mx.decks[0].status !== 'loading', null, { timeout: ANALYZE_TIMEOUT, polling: 500 });
   await loadDeck(page, 1, b);
