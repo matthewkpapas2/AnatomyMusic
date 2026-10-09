@@ -564,7 +564,7 @@ const AnatomyMix = (() => {
     const { A, B, T, K } = C;
     const tempo = T.ease === 'easy' ? 1 : T.ease === 'ok' ? 0.85 : T.ease === 'stretch' ? 0.4 : T.pct == null ? 0.3 : 0.15;
     const key = keyFit(A.home, transposeKey(B.home, K.shift)) - (K.shift ? 0.05 : 0);
-    const Ls = landings(C), Os = launches(C), bestL = Ls.reduce((m, L) => Math.max(m, (L.kind === 'drop' ? 1 : L.kind === 'hit' ? 0.8 : L.kind === 'gap' ? 0.7 : 0.45) * (L.early ? 1 : 0.85)), 0);
+    const Ls = landings(C), Os = launches(C), bestL = Ls.reduce((m, L) => Math.max(m, (L.kind === 'drop' ? 1 : L.kind === 'hit' ? 0.8 : 0.45) * (L.early ? 1 : 0.85)), 0);
     const drops = clamp(0.7 * bestL + 0.3 * (Os.some(o => o.kind === 'build') ? 1 : Os.length ? 0.6 : 0));
     const loud = clamp(1 - Math.max(0, Math.abs(C.trim) - 2) / 10);   // a trim knob fixes it, so it only costs a little
     const vox = A.sung != null && B.sung != null ? clamp(1 - Math.max(0, Math.min(A.sung, B.sung) - 0.35) / 0.5) : 0.7;
@@ -735,7 +735,7 @@ const AnatomyMix = (() => {
     // jumps at the landing in this plan. Sound decides first (the check is also a pass/fail floor).
     const L = x.landing;
     if (x.land != null && L) {
-      const landV = clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : L.kind === 'gap' ? 0.3 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0));
+      const landV = clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0));
       const jump = x.check.contrast == null ? 0 : clamp(x.check.contrast / 12);
       x.payoff = clamp(0.4 * landV + 0.25 * (x.tension == null ? 0.5 : x.tension) + 0.35 * jump);
     } else x.payoff = clamp(0.3 + 0.3 * x.idea);
@@ -809,10 +809,15 @@ const AnatomyMix = (() => {
     const B = C.B, barB = barLen(B), out = [];
     for (const d of B.drops || []) {
       if (B.dur - d.t < 10 * barB || d.t > LAND_MAX * B.dur || d.t < 0.5) continue;
-      if (d.kind !== 'gap' && d.conf < 0.3) continue;
-      out.push({ t: d.t, kind: d.kind, impact: d.kind === 'gap' ? 6 : d.impact, build0: d.build0, buildBars: d.buildBars, built: d.built, gap: d.gap || 0, vox: d.vox, sec: secAt(B, d.t + 0.3), drop: d });
+      // v8: gap-only entries (a silence with no bass return: confidence 0.30, impact 0) are not landings. On house they
+      // fire at 8-bar phrase ends, and on the test songs the one that lost the most went into Nanana's breakdown (its
+      // bass falls 31 dB). A stop that really leads into a bigger section is the "hit" rule's job in findDrops.
+      if (d.kind === 'gap' || d.conf < 0.3) continue;
+      out.push({ t: d.t, kind: d.kind, impact: d.impact, build0: d.build0, buildBars: d.buildBars, built: d.built, gap: d.gap || 0, vox: d.vox, sec: secAt(B, d.t + 0.3), drop: d });
     }
-    if (!out.length) for (const s of B.secs) if ((s.role === 'chorus' || s.role === 'peak') && B.dur - s.t0 > 10 * barB && s.t0 < LAND_MAX * B.dur) out.push({ t: s.t0, kind: 'section', impact: clamp(s.low + 6, 2, 8), build0: Math.max(0, s.t0 - 4 * barB), buildBars: 4, built: false, gap: 0, vox: s.vocal || 0, sec: s, drop: null });
+    // fallback: section starts (chorus or high-energy) when Track 2 has no confident drop or hit to land on. v8: also
+    // when it has only low-confidence ones (hip-hop like Pipe Down, whose gap-only entries used to stand in for these)
+    if (!out.some(x => x.drop.conf >= 0.6)) for (const s of B.secs) if ((s.role === 'chorus' || s.role === 'peak') && s.t0 >= 0.5 && B.dur - s.t0 > 10 * barB && s.t0 < LAND_MAX * B.dur) out.push({ t: s.t0, kind: 'section', impact: clamp(s.low + 6, 2, 8), build0: Math.max(0, s.t0 - 4 * barB), buildBars: 4, built: false, gap: 0, vox: s.vocal || 0, sec: s, drop: null });
     const first = out.reduce((m, x) => !m || x.t < m.t ? x : m, null);
     for (const x of out) x.early = x === first || x.t < 0.35 * B.dur;
     return out;
@@ -825,10 +830,10 @@ const AnatomyMix = (() => {
     for (const o of outs(A, minFrac, 2)) { if (out.some(x => Math.abs(x.t - o.t) < 0.5 * bar)) continue; out.push({ t: o.t, kind: 'phrase', tension: 0.5, prev: o.prev, next: o.next, inner: o.inner, line: lineEnds(A, o.t) }); }
     return out.sort((a, b) => a.t - b.t);
   }
-  const landName = (L) => L.kind === 'drop' ? (L.early ? 'first drop' : `drop at ${fmtTime(L.t)}`) : L.kind === 'hit' ? `chorus hit at ${fmtTime(L.t)}` : L.kind === 'gap' ? `drop at ${fmtTime(L.t)}` : secShort(L.sec);
+  const landName = (L) => L.kind === 'drop' ? (L.early ? 'first drop' : `drop at ${fmtTime(L.t)}`) : L.kind === 'hit' ? `chorus hit at ${fmtTime(L.t)}` : secShort(L.sec);
   const landWhy = (C, L) => L.kind === 'drop' ? `${T2}'s drop at ${fmtTime(L.t)} brings ${Math.round(L.impact)} dB of bass and kick back${L.buildBars > 1 ? ` after ${L.buildBars} bars without them` : ''}: that jump is what a crowd feels as "the drop".`
     : L.kind === 'hit' ? `${T2}'s chorus hits at ${fmtTime(L.t)}: the low end jumps ${Math.round(L.impact)} dB right after a one-bar stop.`
-    : L.kind === 'gap' ? `${T2} goes silent for ${L.gap.toFixed(2)} s right before ${fmtTime(L.t)}, then hits.` : `${T2} has no clear drop, so this lands on the start of its ${secName(L.sec)}.`;
+    : `${T2} has no clear drop, so this lands on the start of its ${secName(L.sec)}.`;
   const tensionWhy = (C, o) => o.kind === 'build' ? `${T1} builds for ${o.drop.buildBars} bars from ${fmtTime(o.drop.build0)}: the crowd is waiting for its drop on ${where(C.A, o.t)}, and gets ${T2}'s instead.` : `${T1}'s ${secShort(o.prev)} ends on ${phraseWord(phraseAt(C.A, o.t))} at ${where(C.A, o.t)}, where a listener expects something new.`;
   const singerOK = (C, o) => o.line > 0.7 ? [`${T1}'s singer has finished the line by the switch, so no word is cut off.`] : [];
   const LEAD = (C, L) => pickupAt(C.B, L.t);
@@ -852,7 +857,7 @@ const AnatomyMix = (() => {
   function soundingBars(P, t, bars) { const g = P.grid; if (!g) return bars; for (let j = 2; j < bars; j++) { const b0 = t - (j + 1) * g.bar; for (let q = 0; q < 4; q++) if (midHi(P, b0 + q * g.beat, b0 + (q + 1) * g.beat) < 0.01) return j; } return bars; }
   const bassStep = (beats, at) => beats >= 4 ? `For the last bar before the switch (from ${at}), turn ${T1}'s bass all the way down: the drop lands in an empty low end.` : `On the last beat before the switch, kill ${T1}'s bass: the drop lands in an empty low end.`;
   // a quick look at how a candidate will score, using the same sound check and payoff as the final ranking
-  function rate(C, x) { const ck = soundCheck(C, x), L = x.landing; const lv = L ? clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : L.kind === 'gap' ? 0.3 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0)) : 0.3; const pay = clamp(0.4 * lv + 0.25 * (x.tension || 0.5) + 0.35 * clamp((ck.contrast || 0) / 12)); return { ck, pay, total: 0.55 * ck.total + 0.45 * pay }; }
+  function rate(C, x) { const ck = soundCheck(C, x), L = x.landing; const lv = L ? clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0)) : 0.3; const pay = clamp(0.4 * lv + 0.25 * (x.tension || 0.5) + 0.35 * clamp((ck.contrast || 0) / 12)); return { ck, pay, total: 0.55 * ck.total + 0.45 * pay }; }
   function best2(cands, key) { cands.sort((a, b) => b.r.total - a.r.total); const keep = []; for (const c of cands) { if (keep.length >= 2) break; if (keep.some(k => key(k, c))) continue; keep.push(c); } return keep; }
   const near = (a, b, s) => Math.abs(a - b) < s;
 
