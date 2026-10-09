@@ -135,14 +135,13 @@ function render(reps, skipped, tol, near) {
 function report(tol, near) {
   const reps = [], skipped = [], broken = [];
   for (const s of allSongs()) {
+    const f = join(CACHE, `${s.id}.json`), r = existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null;
+    // the mirror is checked on every analyzed song, marked or not, so drift can't hide behind missing marks
+    if (r && r.curves && !mirror(r.curves, r.drops).agrees) { broken.push(`${s.id}: the test mirror no longer reproduces findDrops (tests/lib/drop-rules.mjs is out of date)`); continue; }
     if (!Array.isArray(s.ear)) { skipped.push(s.id); continue; }
-    const f = join(CACHE, `${s.id}.json`);
-    if (!existsSync(f)) { broken.push(`${s.id}: not analyzed yet (run without --report)`); continue; }
-    const r = JSON.parse(readFileSync(f, 'utf8'));
+    if (!r) { broken.push(`${s.id}: not analyzed yet (run without --report)`); continue; }
     if (r.missing || r.error) { broken.push(`${s.id}: ${r.missing ? 'file not found' : r.error}`); continue; }
-    const rep = songReport(r, s, tol, near);
-    if (!rep.agrees) { broken.push(`${s.id}: the test mirror no longer reproduces findDrops (tests/lib/drop-rules.mjs is out of date)`); continue; }
-    reps.push(rep);
+    reps.push(songReport(r, s, tol, near));
   }
   for (const b of broken) console.error('SKIP ' + b);
   const md = render(reps, skipped, tol, near);
