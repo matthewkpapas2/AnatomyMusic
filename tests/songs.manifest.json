@@ -1,5 +1,5 @@
 {
-  "about": "Test songs and pairs (docs/test-songs.md). Audio is never committed: 'file' is a filename looked up in the songs folder (ANATOMY_SONGS env var, else tests/songs.local.json {\"dir\": ...}, else ~/Downloads). 'published' values are from Beatport/songbpm.com as listed in 03-test-songs.md; 'v7' holds what anatomy7.html measured on 2026-10-05 for the original four songs.",
+  "about": "Test songs and pairs (docs/03-test-songs.md). 'ear' (optional) is Matt's by-ear drop list as m:ss strings, compared with findDrops by tests/drops-vs-ear.mjs: [] means listened and heard no drop; no field means not marked yet. Audio is never committed: 'file' is a filename looked up in the songs folder (ANATOMY_SONGS env var, else tests/songs.local.json {\"dir\": ...}, else ~/Downloads). 'published' values are from Beatport/songbpm.com as listed in 03-test-songs.md; 'v7' holds what anatomy7.html measured on 2026-10-05 for the original four songs.",
   "songs": [
     { "id": "fisher-losing-it", "file": "FISHER - Losing It (Official Audio).mp3", "artist": "FISHER", "title": "Losing It", "tier": 1,
       "published": { "bpm": 125, "key": "G major", "length": "6:40 (Extended)" }, "received": "radio edit, 4:09", "status": "wrong-version" },
