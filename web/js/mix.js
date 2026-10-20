@@ -1282,7 +1282,9 @@ const AnatomyMix = (() => {
       for (const s of [0, 1, 2, -1]) {
         if (s && !C.beatmatch) continue;
         const up = mod(family(transposeKey(kb, s)) - family(ka), 12); if (s && !(up === 1 || up === 2)) continue;
-        const preBars = clamp(o.drop.buildBars + 1, 2, 9), { plan, tCut } = cutPlan(C, o.t, tb0, preBars, nbB + 6, 0); plan.decks[1].shift = s;
+        // v8 (#43): like Fake-out, the preview starts after any near-silent beat in Track 1's build (the DJ still lets
+        // the whole build run; the silence is the song's own, before the transition starts)
+        const preBars = soundingBars(A, o.t, clamp(o.drop.buildBars + 1, 2, 9)), { plan, tCut } = cutPlan(C, o.t, tb0, preBars, nbB + 6, 0); plan.decks[1].shift = s;
         const tLand = tCut + nbB * barB / C.rB;
         mark(plan, tCut, `${T2}'s build takes over`); mark(plan, tLand, `${T2}'s drop`);
         const x = landed({ tech: 'escalator', cueA: o.t, cueB: tb0, sync: C.beatmatch ? 'match' : null, shift: s, plan, up, nbB }, tLand, L, 1);
