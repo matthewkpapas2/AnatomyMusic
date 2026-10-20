@@ -818,7 +818,11 @@ const AnatomyMix = (() => {
   // end of a phrase (section starts and 8-bar lines in its later part)
   function launches(C, minFrac = 0.42) {
     const A = C.A, bar = barLen(A), end = lastSoundOf(A), out = [];
-    for (const d of A.drops || []) if (d.t >= minFrac * A.dur && end - d.t >= bar && (d.built || d.buildBars >= 2 || d.gap > 0.12)) out.push({ t: d.t, kind: 'build', tension: 1, drop: d, prev: secAt(A, d.t - 0.5), line: lineEnds(A, d.t) });
+    // v8 (#42): a gap-only entry (a silence with no bass return) is a build launch only if the engine saw a build into
+    // it. The silence alone used to qualify it, and on the test songs none of the 26 that did had one: the highs rose at
+    // most 2 dB over the 4 bars before (the riser rule needs 8), the bass never dropped out, and Drugs From Amsterdam's
+    // sat in the song's own fade to -40 dB. Where one falls on a phrase line, outs() still offers it as a phrase launch.
+    for (const d of A.drops || []) if (d.t >= minFrac * A.dur && end - d.t >= bar && (d.built || (d.kind !== 'gap' && (d.buildBars >= 2 || d.gap > 0.12)))) out.push({ t: d.t, kind: 'build', tension: 1, drop: d, prev: secAt(A, d.t - 0.5), line: lineEnds(A, d.t) });
     for (const o of outs(A, minFrac, 2)) { if (out.some(x => Math.abs(x.t - o.t) < 0.5 * bar)) continue; out.push({ t: o.t, kind: 'phrase', tension: 0.5, prev: o.prev, next: o.next, inner: o.inner, line: lineEnds(A, o.t) }); }
     return out.sort((a, b) => a.t - b.t);
   }
@@ -1320,10 +1324,13 @@ const AnatomyMix = (() => {
     }
     return best2(cands, (k, c) => k.hkind === c.hkind).map(x => {
       const r = x.rr, L = x.landing, gap = r.kind === 'A' ? r.d.gap : r.L.gap;
+      // v8 (#42): a gap-only entry is a real silence with no drop after it (Latch 1:51 is a stop inside its chorus), so
+      // the switch still works but Track 1 promised no drop: say "stop", not "drop"
+      const stop = r.kind === 'A' && r.d.kind === 'gap';
       return Object.assign(x, r.kind === 'A' ? {
-        title: `Silence switch: hijack ${T1}'s drop with ${T2}'s`,
-        special: `${T1} has a ${gap.toFixed(2)} s silence before its drop. Switch inside it and the crowd gets a different drop than the one they were promised.`,
-        steps: [`Cue ${T2} at ${where(B, L.t)}.`, `${T1} goes silent for ${gap.toFixed(2)} s before ${fmtTime(r.d.t)}: that's your switch.`, `Pull ${T1}'s fader inside the silence and start ${T2} exactly where ${T1}'s drop would have hit.`],
+        title: stop ? `Silence switch: ${T2}'s drop lands in ${T1}'s stop` : `Silence switch: hijack ${T1}'s drop with ${T2}'s`,
+        special: stop ? `${T1} stops dead for ${gap.toFixed(2)} s and the crowd waits for the beat to come back. It comes back as ${T2}'s drop.` : `${T1} has a ${gap.toFixed(2)} s silence before its drop. Switch inside it and the crowd gets a different drop than the one they were promised.`,
+        steps: [`Cue ${T2} at ${where(B, L.t)}.`, `${T1} goes silent for ${gap.toFixed(2)} s before ${fmtTime(r.d.t)}: that's your switch.`, stop ? `Pull ${T1}'s fader inside the silence and start ${T2} exactly where ${T1}'s beat would have come back.` : `Pull ${T1}'s fader inside the silence and start ${T2} exactly where ${T1}'s drop would have hit.`],
         why: [`A silence wipes the listener's sense of the groove, so ${C.beatmatch ? 'the new drop has nothing to be compared against' : `even a different tempo (${C.B.bpm ? C.B.bpm.toFixed(0) : '?'} vs ${C.A.bpm ? C.A.bpm.toFixed(0) : '?'} BPM) lands clean`}.`, landWhy(C, L)], warn: [], chips: [`${gap.toFixed(2)} s silence`, 'Lands the drop']
       } : {
         title: `Cut into ${T2}'s silence, right before its drop`,
