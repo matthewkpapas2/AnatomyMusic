@@ -730,16 +730,8 @@ const AnatomyMix = (() => {
     x.level = x.level || tech.level; x.name = tech.name; x.hook = x.hook || tech.hook;
     x.idea = clamp(x.score);
     x.check = soundCheck(C, x);
-    // v7: payoff = how hard the transition lands. A drop landing counts most: how big Track 2's drop is, how much
-    // tension Track 1 hands it (the end of a build beats the end of a chorus), and how much the low end actually
-    // jumps at the landing in this plan. Sound decides first (the check is also a pass/fail floor).
-    const L = x.landing;
-    if (x.land != null && L) {
-      const landV = clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0));
-      const jump = x.check.contrast == null ? 0 : clamp(x.check.contrast / 12);
-      x.payoff = clamp(0.4 * landV + 0.25 * (x.tension == null ? 0.5 : x.tension) + 0.35 * jump);
-    } else x.payoff = clamp(0.3 + 0.3 * x.idea);
-    x.score = clamp(0.55 * x.check.total + 0.45 * x.payoff); x.fit = Math.round(1 + 4 * x.score);
+    x.payoff = payoffOf(x, x.check.contrast);
+    x.score = rankOf(x.check, x.payoff); x.fit = Math.round(1 + 4 * x.score);
     x.id = `${x.tech}-${Math.round(x.cueA * 10)}-${Math.round(x.cueB * 10)}`;
     const prep = [];
     const pb = x.plan.decks[1];
@@ -856,8 +848,19 @@ const AnatomyMix = (() => {
   // the longest lead-in of at most `bars` bars before t (and at least 2) that has no beat 20 dB under the song's median
   function soundingBars(P, t, bars) { const g = P.grid; if (!g) return bars; for (let j = 2; j < bars; j++) { const b0 = t - (j + 1) * g.bar; for (let q = 0; q < 4; q++) if (midHi(P, b0 + q * g.beat, b0 + (q + 1) * g.beat) < 0.01) return j; } return bars; }
   const bassStep = (beats, at) => beats >= 4 ? `For the last bar before the switch (from ${at}), turn ${T1}'s bass all the way down: the drop lands in an empty low end.` : `On the last beat before the switch, kill ${T1}'s bass: the drop lands in an empty low end.`;
+  // v7: payoff = how hard the transition lands. A drop landing counts most: how big Track 2's drop is, how much
+  // tension Track 1 hands it (the end of a build beats the end of a chorus), and how much the low end actually jumps
+  // at the landing in this plan (`contrast`, dB, from the sound check). Sound decides first (the check is also a
+  // pass/fail floor). v8 (#44): written once, used by both rate() and finish(); until 2026-10-20 each had its own copy.
+  function payoffOf(x, contrast) {
+    const L = x.landing;
+    if (x.land == null || !L) return clamp(0.3 + 0.3 * clamp(x.score));
+    const landV = clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0));
+    return clamp(0.4 * landV + 0.25 * (x.tension == null ? 0.5 : x.tension) + 0.35 * (contrast > 0 ? clamp(contrast / 12) : 0));
+  }
+  const rankOf = (check, payoff) => clamp(0.55 * check.total + 0.45 * payoff);
   // a quick look at how a candidate will score, using the same sound check and payoff as the final ranking
-  function rate(C, x) { const ck = soundCheck(C, x), L = x.landing; const lv = L ? clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0)) : 0.3; const pay = clamp(0.4 * lv + 0.25 * (x.tension || 0.5) + 0.35 * clamp((ck.contrast || 0) / 12)); return { ck, pay, total: 0.55 * ck.total + 0.45 * pay }; }
+  function rate(C, x) { const ck = soundCheck(C, x), pay = payoffOf(x, ck.contrast); return { ck, pay, total: rankOf(ck, pay) }; }
   function best2(cands, key) { cands.sort((a, b) => b.r.total - a.r.total); const keep = []; for (const c of cands) { if (keep.length >= 2) break; if (keep.some(k => key(k, c))) continue; keep.push(c); } return keep; }
   const near = (a, b, s) => Math.abs(a - b) < s;
 
