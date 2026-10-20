@@ -1,6 +1,6 @@
 # Anatomy: architecture (v7 code in the v8 repo layout)
 
-_Last updated: 2026-10-09. The app code is v7 plus the first v8 changes (Fake-out, landings; `docs/02`). Line numbers
+_Last updated: 2026-10-20. The app code is v7 plus the v8 changes (Fake-out, landings, launches, payoff; `docs/02`). Line numbers
 refer to the files in `web/` and drift with each change._
 
 ## Repo layout
@@ -10,7 +10,7 @@ refer to the files in `web/` and drift with each change._
 | `web/styles.css` | All styles (544 lines) | v7's `<style>` block, lines 12–555 |
 | `web/js/engine.js` | **AnatomyEngine** (892 lines) | v7 script 1. Pure JS, no DOM, Node-exportable. Unchanged since v3. |
 | `web/js/demo.js` | **AnatomyDemo** (178 lines) | v7 script 2. Synth songs with known answers. Unchanged since v5. |
-| `web/js/mix.js` | **AnatomyMix** (1,699 lines) | v7 script 3. Pure JS, no DOM, Node-exportable. |
+| `web/js/mix.js` | **AnatomyMix** (1,742 lines) | v7 script 3. Pure JS, no DOM, Node-exportable. |
 | `web/js/app.js` | **App** (2,495 lines) | v7 script 4: audio I/O, Analysis drawing, `VZ` visuals, the `MX` Mix UI and preview renderer, tabs, main loop. |
 | `server/index.mjs` | Local server | Node ≥ 20.12, no dependencies, 127.0.0.1 only. Serves `web/`; `GET /api/health`; `POST /api/creative` is a stub (501) for the future Claude call. Reads a gitignored `.env` (`ANTHROPIC_API_KEY`, `PORT`). |
 | `data/` | Dataset pipeline | `download/get_subset.py` (run on the Mac), `pipeline/status.py`, `README.md` with the stage plan. `raw/`, `work/` and `out/` are gitignored. |
@@ -50,7 +50,8 @@ tab decides". The file input is `#mx-file` (hidden; the deck buttons click it).
    - Confident drops move a section start within 2.2 bars onto themselves, and `P.phrase.starts` is rebuilt.
    - **Gap-only entries** (`kind: 'gap'`) carry `conf` 0.30 and `impact` 0. On house tracks they fire at 8-bar phrase
      ends (Animals: 8 of them, every 15.0 s). Since 2026-10-09 `landings()` skips them (#31); they still show as small
-     marks on the waveforms, the Silence switch still uses Track 1's, and `launches()` still treats them as builds (#42).
+     marks on the waveforms and the Silence switch still uses Track 1's (as a "stop", not a promised drop). Since
+     2026-10-20 `launches()` treats one as a build only if the engine saw a build into it (#42; none on the test songs).
 
 **`match(A, B)`:** tempo relation, key and best shift, `XS`, LUFS trim; then 22 generators, each through `finish()`
 (sound check, payoff, score). The sound floor (`floorOf(L)` = 0.70 / 0.725 / 0.75) plus a one-voice minimum (0.45 at
@@ -61,10 +62,11 @@ Returns `{ A, B, T, K, trim, XS, warnGrid, ideas, byLevel, skipped, rB, compat }
 **Landings and launches (v7):**
 - `landings(C)`: Track 2's drops and hits (confidence ≥ 0.3) in its first 72% with ≥ 10 bars left. If none of them is
   confident (≥ 0.6), chorus or peak section starts are added (not before 0.5 s). `early` marks the first one or any before 35%.
-- `launches(C, minFrac)`: Track 1's drops with a build (`kind: 'build'`, tension 1) and its phrase lines (`kind: 'phrase'`, tension 0.5), each with `line` (`lineEnds`).
+- `launches(C, minFrac)`: Track 1's drops with a build (`kind: 'build'`, tension 1: `built`, or a real drop with ≥ 2 build bars
+  or a silence > 0.12 s; a gap-only entry needs `built`) and its phrase lines (`kind: 'phrase'`, tension 0.5), each with `line` (`lineEnds`).
 - Helpers: `landed`, `rate`, `best2`, `intoDrop`, `bassOut`, `dropBlend`, `landB` (as documented for v7). v8: `midHi(P, t0, t1)`
   (mids + highs power against the song's median), `hushBeats` (silent beats right before a time) and `soundingBars`
-  (the longest lead-in without a near-silent beat), used by Fake-out.
+  (the longest lead-in without a near-silent beat), used by Fake-out and Build into build (only those two, #46).
 
 **Generators (`TECH` keys):** Level 1 `blend`, `riser`, `cut`, `echo`, `brake`. Level 2 `swap`, `double`, `roll`, `spin`,
 `wash`, `lift`, `layer`, `chord`, `halftime`, `accel`. Level 3 `fakeout`, `escalator`, `hijack`, `wormhole`, `modulate`,
@@ -73,6 +75,8 @@ Returns `{ A, B, T, K, trim, XS, warnGrid, ideas, byLevel, skipped, rB, compat }
 **`soundCheck(C, x)`:** walks the plan at 10 Hz. Rows: rhythm .27, phrase .15, voice .25, key .12, flow .13, clean .08;
 `total = .75·weighted + .25·worst`. Returns `before`/`after`, `hole`, `dead`, `contrast`. `planLevels()` is the band-power
 model behind Flow. Payoff = `0.4·landing value + 0.25·tension + 0.35·contrast/12`; score = `0.55·check + 0.45·payoff`.
+Both are written once, in `payoffOf(x, contrast)` and `rankOf(check, payoff)`, used by `rate()` (the quick look while a
+generator picks candidates) and `finish()` (the final ranking); until 2026-10-20 each had its own copy (#44).
 
 **Exports:** `profile, fitGrid, match, vocalMap, keyRelation, camelot, sharedNotes, transposeKey, diatonic, roman,
 chordNotes, timeStretch, songTime, TECH, LEVEL_NAME, SOUND_FLOOR, floorOf, secName, secShort, where, barNo, firstBar,

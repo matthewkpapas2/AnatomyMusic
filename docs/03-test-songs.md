@@ -1,6 +1,6 @@
 # Anatomy: test song set (v8, platform phase)
 
-_Created 2026-10-07; measured 2026-10-08; versions rechecked 2026-10-09. Matt downloads the songs; the analysis runs on them. Tempo, key and length
+_Created 2026-10-07; measured 2026-10-08; versions rechecked 2026-10-09 and 2026-10-20. Matt downloads the songs; the analysis runs on them. Tempo, key and length
 are as published (Beatport for DJ versions, songbpm.com otherwise). Anatomy measures its own values, and disagreements
 are part of the test. In the repo, the machine-readable list is `tests/songs.manifest.json`._
 
@@ -56,7 +56,7 @@ matters for transitions: the one-voice floors then block Intermediate and Advanc
 ### Timestamps to check by ear
 Write down every drop you hear, including ones missing here, to the nearest second. They go in the manifest as
 `"ear": ["m:ss", …]` per song (`[]` = listened, no drop), and `npm run test:ear` scores the detector against them:
-hits, misses, false drops, timing in beats and which rule failed (`docs/testing.md` 3b). **Status 2026-10-09: not
+hits, misses, false drops, timing in beats and which rule failed (`docs/testing.md` 3b). **Status 2026-10-20: still not
 received yet.** Also worth an ear: Rihanna 1:31 and Animals 1:07 (gap-only entries that used to be landings; is either a
 drop or chorus hit?), and Pipe Down 0:06 / 0:12 (where does the beat come in?).
 
@@ -106,7 +106,7 @@ than the Mix tab's 600 s cap, so only its first 10:00 is analyzed.
 | 13 | Calvin Harris – Feel So Close (Lyrics) | 3:27 | 192 | Usable. This is the lyric-video upload, shorter than the 3:45 listed. |
 | 14 | Skrillex, Fred again.. & Flowdan – Rumble | 2:27 | 192 | OK |
 
-**Rechecked 2026-10-09 with ffprobe:** still 4:08, 2:26 and 5:27, the same files. **Next step for Matt:** re-download #1, #2 and #5 as the Extended or Original Mix. Until then, the radio edits are
+**Rechecked 2026-10-09 with ffprobe:** still 4:08, 2:26 and 5:27, the same files. **2026-10-20:** still the same files (sizes and dates unchanged since Oct 8). **Next step for Matt:** re-download #1, #2 and #5 as the Extended or Original Mix. Until then, the radio edits are
 fine for testing the drop detector but not for testing transitions.
 
 ## Why these songs
