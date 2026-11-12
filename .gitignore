@@ -1,0 +1,32 @@
+# Audio never goes in the repo (copyrighted test songs, downloaded mixes)
+*.mp3
+*.wav
+*.aif
+*.aiff
+*.flac
+*.m4a
+*.ogg
+*.opus
+*.webm
+
+# Secrets: the Claude API key lives in .env (see .env.example)
+.env
+.env.*
+!.env.example
+
+# Data pipeline outputs (downloads, caches, features) stay on Matt's Mac
+data/raw/
+data/work/
+data/out/
+
+# Local test inputs and outputs
+tests/songs.local.json
+tests/out/
+dist/
+
+# Tooling
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+.DS_Store

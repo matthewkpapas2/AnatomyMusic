@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Anatomy</title>
+<meta name="description" content="Play any sound and watch it turn into light, shape and motion driven by its rhythm, harmony and structure, then see it taken apart.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <canvas id="logo" width="88" height="88" aria-hidden="true"></canvas>
+    <div>
+      <h1>Anatomy</h1>
+      <p class="tag">Play any sound. Watch it come apart.</p>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="tab-visuals" aria-selected="true" aria-controls="page-visuals" type="button">Visuals</button>
+    <button class="tab" role="tab" id="tab-analysis" aria-selected="false" aria-controls="page-analysis" type="button" tabindex="-1">Analysis</button>
+    <button class="tab" role="tab" id="tab-mix" aria-selected="false" aria-controls="page-mix" type="button" tabindex="-1">Mix</button>
+  </nav>
+  <div class="controls">
+    <div class="sources" role="group" aria-label="What to listen to">
+      <button class="src src-mic" id="src-mic" type="button"><span class="rec" aria-hidden="true"></span>Listen with microphone</button>
+      <button class="src" id="src-tab" type="button">Listen to a browser tab</button>
+      <button class="src" id="src-demo" type="button">Play the demo song</button>
+      <button class="stop" id="stop" type="button" hidden>Stop</button>
+    </div>
+    <div class="status" id="status" aria-live="polite"><span class="led" id="led"></span><span id="status-text">Getting ready…</span><span class="clock" id="clock"></span></div>
+  </div>
+</header>
+
+<p class="notice" id="notice" role="alert" hidden></p>
+
+
+<section class="page-vis" id="page-visuals" aria-label="Visuals">
+  <div class="stage" id="stage">
+    <canvas class="vz" id="vz-gl" aria-hidden="true"></canvas>
+    <canvas class="vz" id="vz-2d" aria-hidden="true" hidden></canvas>
+    <div class="vz-hud">
+      <div class="vz-top">
+        <span class="vz-chip" id="vz-chip" data-state="idle"><span class="vz-dot"></span><span id="vz-chip-t">Waiting for sound</span></span>
+        <span class="vz-feel" id="vz-feel" hidden>Feels <b id="vz-feel-w">—</b> <span class="vz-est">estimate</span></span>
+      </div>
+      <p class="vz-cap" id="vz-cap" aria-live="polite"></p>
+      <div>
+        <div class="vz-bottom">
+          <div class="vz-read"><div class="vz-chord" id="vz-chord">&nbsp;</div><div class="vz-sub" id="vz-sub"></div></div>
+          <div class="vz-tools">
+            <button class="vz-btn" id="vz-play" type="button" hidden>Replay</button>
+            <button class="vz-btn" id="vz-why" type="button" aria-expanded="false" aria-controls="vz-legend">Why it looks like this</button>
+            <button class="vz-btn" id="vz-clean" type="button" aria-pressed="false" title="Hide text (H)">Hide text</button>
+            <button class="vz-btn" id="vz-full" type="button" title="Full screen (F)">Full screen</button>
+          </div>
+        </div>
+        <canvas class="vz-ribbon" id="vz-ribbon" aria-label="Song timeline with sections. Click to jump there."></canvas>
+      </div>
+    </div>
+
+    <div class="vz-intro" id="vz-intro">
+      <p class="vz-kicker">Anatomy · Visuals</p>
+      <h2 class="vz-title">See how it sounds.</h2>
+      <p class="vz-lede">Every color, shape and movement here follows something measured in the sound: its notes and chords, the beat, loudness, brightness, repetition and structure.</p>
+      <div class="vz-ctas">
+        <button class="vz-cta primary" id="vz-demo" type="button" disabled>Preparing the demo…</button>
+        <button class="vz-cta" id="vz-replay-last" type="button" hidden>Replay your session</button>
+        <button class="vz-cta" id="vz-tab" type="button">Visualize a browser tab</button>
+        <button class="vz-cta" id="vz-mic" type="button">Visualize the microphone</button>
+      </div>
+      <p class="vz-small" id="vz-intro-note">Sound on · F for full screen · H to hide the text</p>
+    </div>
+
+    <aside class="vz-legend" id="vz-legend" aria-labelledby="vz-leg-h" hidden>
+      <div class="vz-leg-head"><h3 id="vz-leg-h">Why it looks like this</h3><button class="vz-x" id="vz-why-x" type="button" aria-label="Close">×</button></div>
+      <p class="vz-leg-lede">Nothing here is random decoration. Each part of the picture follows one measurement, shown live under each line.</p>
+      <figure class="vz-mood-box">
+        <canvas id="vz-mood" aria-label="Estimated mood: dark to bright across, calm to energetic up"></canvas>
+        <figcaption>The <b>feel</b> is a rough estimate from key mode, tempo, loudness, brightness and how busy the rhythm is. People hear mood differently, so treat it as a guess.</figcaption>
+      </figure>
+      <dl class="vz-map">
+        <div><dt>Color → the notes</dt><dd>Each note name has its own hue, placed around the circle of fifths, so a key shows up as a family of neighboring colors. Only notes that are sounding glow.<span class="vz-live"><span class="vz-notes" id="lv-notes"></span></span></dd></div>
+        <div><dt>Light, warmth and vividness → key mode and tempo</dt><dd>Major keys and faster tempos render lighter, warmer and more saturated. Minor and slower music renders darker and cooler. People make the same match between music and color, and it runs through the emotion they hear (Palmer et al., 2013).<span class="vz-live" id="lv-light"></span></dd></div>
+        <div><dt>Sharp or round → brightness of the sound</dt><dd>Bright, harsh sound (energy high in the spectrum) cuts thin creases and throws angular shards and polygons. Soft, dark sound makes round blobs and circles. Listeners tie harsh timbres to angular shapes and soft ones to rounded shapes (Adeli et al., 2014).<span class="vz-live" id="lv-shape"></span></dd></div>
+        <div><dt>Shockwaves → the beat</dt><dd>Each detected beat launches a ring from the chord. How hard it hits follows punch: how far peaks jump above the average level.<span class="vz-live" id="lv-beat"></span></dd></div>
+        <div><dt>Trails → sustain</dt><dd>Smooth, held notes leave long trails. Short, percussive sound vanishes quickly.<span class="vz-live" id="lv-trail"></span></dd></div>
+        <div><dt>The triangle → the chord</dt><dd>Its corners sit on the chord's three notes around a clock of the 12 notes (C at the top, like the dots around it). Major and minor chords are mirror-image triangles, and the corners glide the shortest way to the next chord, so you can watch the harmony move. With no clear chord, a star shows each note's strength.<span class="vz-live" id="lv-chord"></span></dd></div>
+        <div><dt>Symmetry → repetition</dt><dd>When the song closely repeats something from at least 15 seconds earlier, the picture folds into a kaleidoscope.<span class="vz-live" id="lv-echo"></span></dd></div>
+        <div><dt>Outer geometry → the section</dt><dd>Each section gets its own motif (orbits, lattice, petals, spiral, star, waves). When a section comes back, its motif comes back. During live listening, sections are confirmed about 9 seconds late; replays are exact.<span class="vz-live" id="lv-form"></span></dd></div>
+        <div><dt>Rushing forward → a build-up</dt><dd>When brightness and loudness climb together for several seconds, streaks fly outward and everything accelerates.<span class="vz-live" id="lv-build"></span></dd></div>
+        <div><dt>Blackout, then burst → a drop</dt><dd>A sudden silence pulls everything inward. When the sound slams back, it explodes outward in a flash.<span class="vz-live" id="lv-drop"></span></dd></div>
+        <div><dt>Glow at the center → bass</dt><dd>Energy below 250 Hz swells the center in the key's home color.<span class="vz-live" id="lv-bass"></span></dd></div>
+        <div><dt>Sparkles → the airy top end</dt><dd>Energy between 6 and 16 kHz (cymbals, breath, shimmer) makes points of light flicker.<span class="vz-live" id="lv-air"></span></dd></div>
+        <div><dt>Comet → one clear pitch</dt><dd>When a single note is clear (a voice, a whistle, a solo line), a comet follows it. Its angle is the note and its distance from the center is how high it is.<span class="vz-live" id="lv-comet"></span></dd></div>
+        <div><dt>Grain and turbulence → noisiness</dt><dd>Noisy sound (a flat spectrum, like hiss or distortion) adds grain and stirs the currents.<span class="vz-live" id="lv-grain"></span></dd></div>
+      </dl>
+      <p class="vz-leg-foot">Research behind two of the mappings: <a href="https://www.pnas.org/doi/10.1073/pnas.1212562110" target="_blank" rel="noopener">Palmer et al., "Music–color associations are mediated by emotion," PNAS 2013</a> · <a href="https://www.frontiersin.org/journals/human-neuroscience/articles/10.3389/fnhum.2014.00352/full" target="_blank" rel="noopener">Adeli, Rouat &amp; Molotchnikoff, "Audiovisual correspondence between musical timbre and visual shapes," Frontiers in Human Neuroscience 2014</a>.</p>
+    </aside>
+  </div>
+</section>
+
+<main class="grid" id="page-analysis" hidden>
+  <div class="main-col">
+  <section class="panel shape" aria-labelledby="h-shape">
+    <div class="panel-head">
+      <h2 id="h-shape">Shape</h2>
+      <p class="hint">Every point compares two moments of the song. Bright diagonal stripes are parts that repeat. Click anywhere on it to hear both moments.</p>
+    </div>
+    <div class="canvas-box"><canvas id="tri" aria-label="Self-similarity triangle of the song"></canvas></div>
+    <div class="canvas-box"><canvas id="lanes" aria-label="Timeline of sections, chords, key and energy"></canvas></div>
+    <p class="readout" id="readout">Hover the shape or the timeline to compare moments.</p>
+  </section>
+
+
+  <section class="panel spectrum" aria-labelledby="h-spec">
+    <div class="panel-head">
+      <h2 id="h-spec">Spectrum</h2>
+      <p class="hint">Low notes at the bottom, high at the top, time moving left. Each note name has its own color, so a key shows up as a family of neighboring colors.</p>
+    </div>
+    <div class="spec-wrap"><canvas id="spec-axis" aria-hidden="true"></canvas><canvas id="spec" aria-label="Scrolling spectrogram colored by note"></canvas></div>
+  </section>
+  </div>
+
+  <aside class="rail" aria-label="Live readings">
+    <section class="card" aria-labelledby="h-pulse">
+      <div class="card-head"><h3 id="h-pulse">Pulse</h3><span class="chip" id="pulse-chip">—</span></div>
+      <div class="pulse-row">
+        <canvas id="beat" width="160" height="160" aria-hidden="true"></canvas>
+        <div><div class="big" id="bpm">—</div><div class="unit">beats per minute</div></div>
+      </div>
+      <p class="why" id="pulse-why">Waiting for a steady beat.</p>
+    </section>
+
+    <section class="card" aria-labelledby="h-harm">
+      <div class="card-head"><h3 id="h-harm">Harmony</h3><span class="chip" id="key-chip">—</span></div>
+      <canvas id="wheel" class="wheel" aria-label="Circle of fifths showing which notes are sounding"></canvas>
+      <p class="why" id="harm-why">Notes light up around the circle of fifths. Neighbors on the circle sound good together.</p>
+    </section>
+
+    <section class="card" aria-labelledby="h-char">
+      <div class="card-head"><h3 id="h-char">Character</h3></div>
+      <p class="sounds" id="sounds">—</p>
+      <div class="meters" id="meters"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-bal">
+      <div class="card-head"><h3 id="h-bal">Balance</h3><span class="chip" id="level-chip">—</span></div>
+      <div class="bars" id="bars"></div>
+      <div class="width" id="width-row" hidden><span>Stereo width</span><div class="width-track"><div class="width-fill" id="width-fill"></div></div><span class="width-val" id="width-val"></span></div>
+      <p class="why" id="bal-why">How the energy splits from deep sub-bass up to the airy top end.</p>
+    </section>
+  </aside>
+
+  <section class="panel moments" aria-labelledby="h-mom">
+    <div class="panel-head">
+      <h2 id="h-mom">Moments</h2>
+      <p class="hint" id="mom-hint">Things worth noticing, found as they happen.</p>
+    </div>
+    <ol class="moment-list" id="moments"></ol>
+  </section>
+
+  <section class="panel summary" aria-labelledby="h-sum">
+    <div class="panel-head">
+      <h2 id="h-sum">Summary</h2>
+      <p class="hint" id="sum-hint">Fills in when a session ends.</p>
+    </div>
+    <dl class="facts" id="facts"></dl>
+    <canvas id="dna" aria-label="Song DNA card"></canvas>
+    <div class="dna-actions"><button class="btn" id="save-dna" type="button" disabled>Save as image</button></div>
+  </section>
+
+  <details class="panel how">
+    <summary><h2>How it works</h2></summary>
+    <div class="how-body">
+      <p>Everything runs in this page. Sound is split into short overlapping slices (2,048 samples each, about 100 per second), and each slice goes through a Fourier transform to see which frequencies are present.</p>
+      <dl>
+        <dt>Pulse</dt><dd>Sudden rises in energy ("onsets") are collected over 8 seconds, and the engine checks which beat spacing makes them line up best (autocorrelation, 60–200 BPM). It then looks at how far each real hit lands from a perfectly steady grid. A few milliseconds usually means programmed drums or a click track.</dd>
+        <dt>Harmony</dt><dd>A longer 8,192-sample transform finds the peaks in the spectrum and folds them into 12 note names (a chromagram). Chords come from matching those 12 values against every major and minor triad. The key comes from comparing the long-term note balance with the Krumhansl–Kessler profiles, which describe how often each note is heard in each key.</dd>
+        <dt>Shape</dt><dd>Every half second becomes one block described by its notes, tone color and loudness. Each block is compared with every earlier block, which builds the triangle. Sections begin where the sound before and after a point is internally similar but different from each other (Foote's checkerboard novelty). Sections are matched in all 12 transpositions, so a chorus moved up a key is still recognized.</dd>
+        <dt>Moments</dt><dd>Drops, build-ups, bass entrances and key changes are found by watching loudness, brightness and bass energy for specific shapes over time.</dd>
+      </dl>
+      <p>These are measurements, not certainties. Anything labeled "likely" or "about" is an estimate. Relative keys such as A minor and C major share all their notes, so either reading can be fair.</p>
+    </div>
+  </details>
+</main>
+
+<section class="mixpage" id="page-mix" aria-label="Mix" hidden>
+  <header class="mx-intro">
+    <h2 class="mx-title">Mix two songs</h2>
+    <p class="mx-lede">Load the song that's playing and the one you want next. Anatomy finds where they can meet, previews each transition, and tells you what to do on your decks, bar by bar. It suggests; you mix.</p>
+    <button class="btn mx-demo" id="mx-demo" type="button">Try two demo songs</button>
+  </header>
+
+  <section class="mx-compat" id="mx-compat" aria-labelledby="mx-compat-h" hidden></section>
+
+  <div class="mx-console" id="mx-console">
+    <article class="deck" id="deck-0" data-deck="0" aria-labelledby="deck-0-h"></article>
+    <div class="mx-fit" id="mx-fit">
+      <div class="fit-items" id="mx-tiles"><p class="fit-empty">Load two songs to see how their tempo, key, loudness and beat grids line up.</p></div>
+      <button class="mx-swap" id="mx-swap" type="button" title="Swap which song plays first" aria-label="Swap the two songs" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3v11M6 14l-3-3M6 14l3-3M14 17V6M14 6l-3 3M14 6l3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Swap</span></button>
+    </div>
+    <article class="deck" id="deck-1" data-deck="1" aria-labelledby="deck-1-h"></article>
+  </div>
+  <input type="file" id="mx-file" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.aiff,.aif" hidden>
+
+  <section class="mx-ideas" id="mx-ideas" aria-labelledby="mx-ideas-h" hidden>
+    <div class="mx-ideas-head">
+      <h2 id="mx-ideas-h">Transitions</h2>
+      <div class="mx-levels" id="mx-levels" role="radiogroup" aria-label="Skill level">
+        <button class="mx-level" role="radio" type="button" data-level="1" aria-checked="true">Beginner</button>
+        <button class="mx-level" role="radio" type="button" data-level="2" aria-checked="false" tabindex="-1">Intermediate</button>
+        <button class="mx-level" role="radio" type="button" data-level="3" aria-checked="false" tabindex="-1">Advanced</button>
+      </div>
+      <p class="hint mx-level-note" id="mx-level-note"></p>
+    </div>
+    <div class="mx-work">
+      <nav class="mx-rail" aria-label="Transition ideas, best first">
+        <ol class="mx-list" id="mx-list"></ol>
+        <details class="mx-skipped" id="mx-skipped-box"><summary>Checked but not suggested</summary><ul id="mx-skipped"></ul></details>
+      </nav>
+      <article class="mx-stage" id="mx-stage" aria-live="polite"></article>
+    </div>
+    <details class="mx-gloss" id="mx-gloss"><summary>New to DJing? The words used here</summary>
+      <dl>
+        <dt>Beatmatch</dt><dd>Adjust one song's tempo (the pitch fader, or Sync) so both beats line up.</dd>
+        <dt>Downbeat, "the one"</dt><dd>The first beat of a bar. Changes land hardest here.</dd>
+        <dt>Bar, phrase</dt><dd>A bar is 4 beats. Songs are built in phrases of 4, 8 or 16 bars, and sections start on phrase lines. Transitions sound right when they start and end on one.</dd>
+        <dt>3-band EQ</dt><dd>The low, mid and high knobs on each channel. Turned all the way down, a band is "killed". Bass lives in the lows, voices and chords in the mids, hats and cymbals in the highs.</dd>
+        <dt>Bass swap</dt><dd>Turning one song's low knob down and the other's up in the same moment, so two basslines never play at once.</dd>
+        <dt>Filter</dt><dd>One knob that removes the lows (high-pass) or the highs (low-pass).</dd>
+        <dt>Key lock</dt><dd>Keeps a song's pitch the same when you change its tempo.</dd>
+        <dt>Trim / gain</dt><dd>A song's input level, set before the fader so both songs play equally loud.</dd>
+        <dt>Camelot code</dt><dd>DJ shorthand for keys (8A is A minor). Neighbors on the wheel mix well.</dd>
+        <dt>Pickup</dt><dd>Words sung just before a downbeat. Start the song early enough to keep them.</dd>
+        <dt>Build-up, drop</dt><dd>A build-up takes the bass and kick away and adds tension (risers, snare rolls, a rising filter). The drop is the downbeat where they come back. Every transition here lands on one.</dd>
+        <dt>Echo, reverb wash</dt><dd>Effects that let a song trail off: repeats of its last beat, or a long tail of reverb with no beat in it.</dd>
+        <dt>Brake, spinback</dt><dd>Effects that stop a song like a turntable losing power, or throw it into reverse.</dd>
+      </dl>
+    </details>
+  </section>
+
+  <details class="panel mx-map" id="mx-mappanel" hidden>
+    <summary><h2 id="mx-map-h">Where they sound alike</h2><span class="hint">A map of every moment of one song against every moment of the other. Click a spot to hear both.</span></summary>
+    <p class="hint mx-map-note">Across: Track 1. Down: Track 2. Brighter means the two moments share more notes, tone color and loudness. Numbered pins are the transitions listed above.</p>
+    <div class="mx-map-box"><canvas id="mx-map" aria-label="Map of how alike each moment of the two songs is"></canvas></div>
+    <p class="readout" id="mx-map-read">Hover the map to compare moments.</p>
+  </details>
+
+  <details class="panel how mx-how">
+    <summary><h2>How the Mix tab decides</h2></summary>
+    <div class="how-body">
+      <p>Both songs are analyzed in this page by the same engine as the rest of Anatomy, and never leave your computer. The Mix tab then measures what a DJ listens for and checks every idea against the rules that make a transition sound clean.</p>
+      <dl>
+        <dt>Beat grid</dt><dd>The audio is split into kick, mid and snare bands, and one steady grid of beats is fitted to where their hits land, to within a few milliseconds. The kick decides where the beat is, so off-beat hats and bass lines can't pull the grid half a beat off. Which beat starts each bar is a vote between chord changes (they land on beat 1), the kick on 1 and 3, and the snare or clap on 2 and 4.</dd>
+        <dt>Phrases</dt><dd>Each bar line gets a score for how much changes there, in harmony, tone, loudness, drums and vocals. Section starts move to the strongest nearby bar line, preferring sections that last whole 4-bar phrases.</dd>
+        <dt>Vocals</dt><dd>Lead vocals are usually mixed dead center, pitched and syllabic, so Anatomy listens for exactly that, every 23 ms. Centered synth leads look the same, so it says "likely vocals". Mono files can't be checked this way.</dd>
+        <dt>Drops</dt><dd>Each bar's bass and kick level is measured from the audio. A drop is where they come back at full strength after the song took them away (a breakdown or build-up), or where a riser stops dead and the beat gets fuller. A chorus "hit" is the same thing on a smaller scale, after a one-bar stop. Every transition lands on one of the next song's drops or hits.</dd>
+        <dt>Sound check</dt><dd>Every idea's plan is played through on paper ten times a second. Rhythm: do the beats lock wherever both songs play? Phrase: are both cue points on phrase lines? One voice: do two singers ever overlap, and does anyone get cut off mid-word? Key: where both songs overlap, do their keys agree? Flow: does the sound sag in the middle, or land quieter than it left? Clean audio: is anything stretched or pitch-shifted hard? Nothing scoring under 70 is suggested (72 at Intermediate, 75 at Advanced, which also need the one-voice part above 45 and 60), so a more creative level is never the worse-sounding one.</dd>
+        <dt>Ranking</dt><dd>Sound check first (55%), then payoff (45%): how big the drop it lands is, how much tension leads into it, and how much the bass actually jumps at that downbeat in the plan.</dd>
+        <dt>Compatibility</dt><dd>One number for the pair: tempo, key, whether the next song has a drop to land on, loudness, vocals, and (weighted most) how good the best transition found is. The weights are judgment calls for now.</dd>
+        <dt>Loudness</dt><dd>Measured in LUFS, the way streaming services do, so the trim advice matches what you hear.</dd>
+        <dt>Previews</dt><dd>Rendered in your browser: a 3-band kill EQ like a club mixer's, filters, a tempo-synced echo, a reverb, a simple time-stretch and a limiter. Nothing uses stem splitting: an in-page split leaks too much of the rest of the song to sound clean.</dd>
+      </dl>
+    </div>
+  </details>
+</section>
+
+<footer class="foot">
+  <p>Audio never leaves this page. It's kept in memory only so you can replay moments, and it's gone when you close the tab. Works best in Chrome. For the cleanest signal, use "Listen to a browser tab" and play the song in another tab.</p>
+</footer>
+
+<script src="js/engine.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/mix.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
