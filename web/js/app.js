@@ -97,6 +97,7 @@
   let live = null;            // { stream, srcNode, tap, sink, demoSrc }
   let warm = null;            // continuous listening: { engine, rec } warming up to take over
   let handoffDue = false, handoffs = 0, liveBase = 0;   // liveBase: seconds listened before the current engine's 0:00
+  let wake = null;            // screen wake lock held while listening
   let play = null;            // replay in progress
   let workletReady = false;
   let lastBeatWall = -1e9, lastViewT = null;
@@ -162,6 +163,18 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
     VZ.adopt(from, engine);
     setStatus(`${source === 'mic' ? 'Listening to your microphone' : 'Listening to the shared tab'}. Analysis and replay keep the most recent minutes.`, 'live');
   }
+  // Keep the display awake while listening: during a set nobody touches the computer. Chrome drops the lock when
+  // the page is hidden, so it's asked for again when the page shows.
+  async function holdScreen(on) {
+    try {
+      if (on && !wake && navigator.wakeLock && document.visibilityState === 'visible') {
+        const w = await navigator.wakeLock.request('screen');
+        if (mode !== 'listening' || wake) { w.release(); return; }
+        wake = w; w.addEventListener('release', () => { if (wake === w) wake = null; });
+      } else if (!on && wake) { const w = wake; wake = null; await w.release(); }
+    } catch (err) { /* not supported or not allowed: the display follows the computer's sleep setting */ }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && mode === 'listening') holdScreen(true); });
   function ensureCtx() {
     if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     return actx;
@@ -235,7 +248,7 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
     srcNode.connect(tap); tap.connect(sink); sink.connect(ctx.destination);
     if (demoSrc) { demoSrc.connect(ctx.destination); demoSrc.onended = () => stopListening(); demoSrc.start(); }
     live = { stream, srcNode, tap, sink, demoSrc };
-    mode = 'listening';
+    mode = 'listening'; holdScreen(true);
     setStatus(kind === 'mic' ? 'Listening to your microphone' : kind === 'tab' ? 'Listening to the shared tab' : 'Playing and analyzing the demo song', 'live');
     $('mom-hint').textContent = 'Found as they happen. New sections are confirmed about 9 seconds after they start, then placed at the right time.';
     setButtons();
@@ -243,7 +256,7 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
 
   async function stopListening(reason) {
     if (mode !== 'listening') return;
-    mode = 'stopped'; warm = null;
+    mode = 'stopped'; warm = null; holdScreen(false);
     const L = live; live = null;
     if (L) {
       try { L.srcNode.disconnect(); } catch (e) { }
@@ -2537,7 +2550,7 @@ void main(){
     else $('clock').textContent = fmtTime(engine.time);
     lastViewT = view.mode === 'replay' ? view.t : null;
   }
-  if (/[?&]debug\b/.test(location.search)) window.__live = () => ({ mode, source, handoffs, total: liveBase + (engine ? engine.time : 0), t: engine ? engine.time : 0, warm: warm ? warm.engine.time : null, locked: !!(engine && engine.locked), bpm: engine ? engine.bpm : 0, blocks: engine ? engine.nB : 0 });
+  if (/[?&]debug\b/.test(location.search)) window.__live = () => ({ mode, source, handoffs, total: liveBase + (engine ? engine.time : 0), t: engine ? engine.time : 0, warm: warm ? warm.engine.time : null, locked: !!(engine && engine.locked), bpm: engine ? engine.bpm : 0, blocks: engine ? engine.nB : 0, awake: !!wake });
   clearSummary();
   requestAnimationFrame(loop);
   runExample();
