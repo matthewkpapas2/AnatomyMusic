@@ -43,7 +43,8 @@ Shape compares every half second with every earlier one (about 90 MB at 10 minut
 - The header clock and the Visuals "Live ·" chip show total listening time (h:mm:ss past an hour).
 - **The cost:** Analysis, replay, the Song DNA card and "send to a Mix deck" cover only the current session (up to 10
   minutes). The status line says so after the first handoff and after Stop. A whole set can't be reviewed afterwards.
-- A screen wake lock is held while listening, so the display doesn't sleep mid-set. Not tested on a real display.
+- A screen wake lock is asked for while listening, so the display doesn't sleep mid-set. Not tested on a real
+  display (tech debt #51).
 
 **Measured** (`04-results-2026-11-12.md`; headless Chromium, the real microphone path, a looping WAV of the demos):
 - Real constants: 20:37 of listening, 2 handoffs (at 515 s and 519 s, both on a section change), the beat locked at
@@ -283,9 +284,10 @@ the drop detector and profiler on every test song, run the harness on the 10 tes
     section A and knows only its own 60–150 s, so Visuals can change section color at a handoff and "echo" can't see
     further back. Handoffs wait for a section change so this lands on a real change; whether it's noticeable is
     untested by eye.
-51. **NEW (2026-11-12): the screen wake lock is untested on a real display,** and Chrome only offers it on secure
-    pages. `npm start` (localhost) qualifies; whether a page opened from a file does wasn't checked. Where it isn't
-    granted, the display follows the Mac's sleep setting.
+51. **NEW (2026-11-12): the screen wake lock is untested on a real display.** Headless Chromium refuses it by
+    default, so the long test runs never held it. With the permission granted it's held while listening and released
+    on Stop (checked once by hand, not in the repo's tests). Where Chrome doesn't grant it, the display follows the
+    Mac's sleep setting.
 52. **NEW (2026-11-12): `tests/live-handoff.mjs --fast` rewrites three constants in `app.js` by text** as the page
     loads. It fails loudly if those lines change, but it's a second place that knows them.
 53. **NEW (2026-11-12): the "Reached the 10-minute limit" stop can't be reached today.** Microphone and tab sessions
