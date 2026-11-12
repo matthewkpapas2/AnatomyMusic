@@ -232,8 +232,9 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
       const song = AnatomyDemo.render(sr);
       newSession('example', sr, { pitchEvery: 6 });
       mode = 'example';
-      let i = 0; const n = song.L.length, CH = 4096;
+      let i = 0; const n = song.L.length, CH = 4096, mine = engine;
       const step = () => {
+        if (engine !== mine) return;   // another session started before the demo was ready: leave that session alone
         const until = performance.now() + 18;
         while (i < n && performance.now() < until) {
           const L = song.L.subarray(i, i + CH), R = song.R.subarray(i, i + CH);
