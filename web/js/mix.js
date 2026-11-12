@@ -819,9 +819,9 @@ const AnatomyMix = (() => {
   function launches(C, minFrac = 0.42) {
     const A = C.A, bar = barLen(A), end = lastSoundOf(A), out = [];
     // v8 (#42): a gap-only entry (a silence with no bass return) is a build launch only if the engine saw a build into
-    // it. The silence alone used to qualify it, and on the test songs none of the 26 that did had one: the highs rose at
-    // most 2 dB over the 4 bars before (the riser rule needs 8), the bass never dropped out, and Drugs From Amsterdam's
-    // sat in the song's own fade to -40 dB. Where one falls on a phrase line, outs() still offers it as a phrase launch.
+    // it. The silence alone used to qualify it, and on the test songs none of the 27 that did had one: `built` was false
+    // on all 27, the highs rose at most 2 dB and the bass fell at most 5 dB over the 4 bars before, and Drugs From
+    // Amsterdam's 1:34 sat in the song's own fade. Where one falls on a phrase line, outs() still offers it as a phrase launch.
     for (const d of A.drops || []) if (d.t >= minFrac * A.dur && end - d.t >= bar && (d.built || (d.kind !== 'gap' && (d.buildBars >= 2 || d.gap > 0.12)))) out.push({ t: d.t, kind: 'build', tension: 1, drop: d, prev: secAt(A, d.t - 0.5), line: lineEnds(A, d.t) });
     for (const o of outs(A, minFrac, 2)) { if (out.some(x => Math.abs(x.t - o.t) < 0.5 * bar)) continue; out.push({ t: o.t, kind: 'phrase', tension: 0.5, prev: o.prev, next: o.next, inner: o.inner, line: lineEnds(A, o.t) }); }
     return out.sort((a, b) => a.t - b.t);
@@ -1282,7 +1282,9 @@ const AnatomyMix = (() => {
       for (const s of [0, 1, 2, -1]) {
         if (s && !C.beatmatch) continue;
         const up = mod(family(transposeKey(kb, s)) - family(ka), 12); if (s && !(up === 1 || up === 2)) continue;
-        const preBars = clamp(o.drop.buildBars + 1, 2, 9), { plan, tCut } = cutPlan(C, o.t, tb0, preBars, nbB + 6, 0); plan.decks[1].shift = s;
+        // v8 (#43): like Fake-out, the preview starts after any near-silent beat in Track 1's build (the DJ still lets
+        // the whole build run; the silence is the song's own, before the transition starts)
+        const preBars = soundingBars(A, o.t, clamp(o.drop.buildBars + 1, 2, 9)), { plan, tCut } = cutPlan(C, o.t, tb0, preBars, nbB + 6, 0); plan.decks[1].shift = s;
         const tLand = tCut + nbB * barB / C.rB;
         mark(plan, tCut, `${T2}'s build takes over`); mark(plan, tLand, `${T2}'s drop`);
         const x = landed({ tech: 'escalator', cueA: o.t, cueB: tb0, sync: C.beatmatch ? 'match' : null, shift: s, plan, up, nbB }, tLand, L, 1);
