@@ -10,7 +10,8 @@
     "test": "node tools/build-single.mjs && node --test tests/unit/*.test.mjs && node tests/regression.mjs",
     "test:songs": "node tests/profile-songs.mjs",
     "test:pairs": "node tests/measure/run.mjs",
-    "test:ear": "node tests/drops-vs-ear.mjs"
+    "test:ear": "node tests/drops-vs-ear.mjs",
+    "test:live": "node tests/live-handoff.mjs"
   },
   "devDependencies": {
     "playwright": "1.56.0"

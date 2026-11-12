@@ -7,6 +7,10 @@
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a = 0, b = 1) => x < a ? a : x > b ? b : x;
   const MAX_SEC = 600;
+  // Continuous listening (microphone and tab): one session can't outgrow MAX_SEC, so WARM_LEAD seconds before it
+  // fills, a second engine starts on the same sound, and once it has heard WARM_MIN seconds it takes over (handoff()).
+  const WARM_LEAD = 150, WARM_MIN = 60;
+  const longTime = (t) => t < 3600 ? fmtTime(t) : `${Math.floor(t / 3600)}:${String(Math.floor(t % 3600 / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 
   /* ---------------- color: every note name gets a hue, placed around the circle of fifths ---------------- */
   function oklch(L, C, hDeg) {
@@ -91,6 +95,9 @@
   /* ---------------- state ---------------- */
   let actx = null, engine = null, rec = null, mode = 'boot', source = null;
   let live = null;            // { stream, srcNode, tap, sink, demoSrc }
+  let warm = null;            // continuous listening: { engine, rec } warming up to take over
+  let handoffDue = false, handoffs = 0, liveBase = 0;   // liveBase: seconds listened before the current engine's 0:00
+  let wake = null;            // screen wake lock held while listening
   let play = null;            // replay in progress
   let workletReady = false;
   let lastBeatWall = -1e9, lastViewT = null;
@@ -126,16 +133,48 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
     engine = new Engine(sr, Object.assign({ maxSec: MAX_SEC }, opts));
     rec = new Recorder(sr, MAX_SEC);
     source = kind; sessionStamp = new Date();
+    warm = null; handoffDue = false; handoffs = 0; liveBase = 0;
     seenMoments.clear(); shapeDirty = true; momentsDirty = true; summaryDirty = false;
     spec.drawnEnd = -1; lastBeatWall = -1e9; lastViewT = null; hover = null;
-    engine.on((type, d) => {
-      if (type === 'beat') { if (mode === 'listening') lastBeatWall = performance.now(); }
-      else if (type === 'moment' || type === 'moments-changed') momentsDirty = true;
-      else if (type === 'block' || type === 'section' || type === 'key') shapeDirty = true;
-      else if (type === 'full') setTimeout(() => stopListening('Reached the 10-minute limit for one session, so listening stopped. Everything up to here is kept.'), 0);
-    });
+    follow(engine);
     clearSummary();
   }
+  function follow(e) {
+    e.on((type) => {
+      if (e !== engine) return;   // an engine that is still warming up says nothing until it takes over
+      if (type === 'beat') { if (mode === 'listening') lastBeatWall = performance.now(); }
+      else if (type === 'moment' || type === 'moments-changed') momentsDirty = true;
+      else if (type === 'block' || type === 'key') shapeDirty = true;
+      else if (type === 'section') { shapeDirty = true; handoffDue = true; }
+      else if (type === 'full' && !warm) setTimeout(() => stopListening('Reached the 10-minute limit for one session, so listening stopped. Everything up to here is kept.'), 0);
+    });
+  }
+  // Continuous listening. The engine keeps every measurement of a session in memory, and the Shape compares every
+  // half second with every earlier one, so a single session can't run for hours. Instead the warmed-up engine takes
+  // over: it already has the beat, the key and its first sections, so Visuals keeps going. It takes over on a section
+  // change if one comes in time (the picture is changing then anyway), and when the old engine is full at the latest.
+  // Analysis and replay then cover the new engine's time only: what came before the warm-up is dropped.
+  function handoff() {
+    const from = engine;
+    liveBase += from.time - warm.engine.time; handoffs++;
+    engine = warm.engine; rec = warm.rec; warm = null;
+    seenMoments.clear(); for (const m of engine.moments) seenMoments.add(m.id);
+    shapeDirty = true; momentsDirty = true; spec.drawnEnd = -1; lastViewT = null; hover = null;
+    VZ.adopt(from, engine);
+    setStatus(`${source === 'mic' ? 'Listening to your microphone' : 'Listening to the shared tab'}. Analysis and replay keep the most recent minutes.`, 'live');
+  }
+  // Keep the display awake while listening: during a set nobody touches the computer. Chrome drops the lock when
+  // the page is hidden, so it's asked for again when the page shows.
+  async function holdScreen(on) {
+    try {
+      if (on && !wake && navigator.wakeLock && document.visibilityState === 'visible') {
+        const w = await navigator.wakeLock.request('screen');
+        if (mode !== 'listening' || wake) { w.release(); return; }
+        wake = w; w.addEventListener('release', () => { if (wake === w) wake = null; });
+      } else if (!on && wake) { const w = wake; wake = null; await w.release(); }
+    } catch (err) { /* not supported or not allowed: the display follows the computer's sleep setting */ }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && mode === 'listening') holdScreen(true); });
   function ensureCtx() {
     if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
     return actx;
@@ -157,6 +196,16 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
   function ingest(L, R) {
     if (mode !== 'listening' || !engine) return;
     engine.push(L, R); rec.push(L, R);
+    if (source === 'mic' || source === 'tab') {
+      if (warm) {
+        warm.engine.push(L, R); warm.rec.push(L, R);
+        if (warm.engine.time >= WARM_MIN && (handoffDue || engine.full)) handoff();
+      } else if (engine.time >= MAX_SEC - WARM_LEAD) {
+        warm = { engine: new Engine(engine.sr, { maxSec: MAX_SEC }), rec: new Recorder(engine.sr, MAX_SEC) };
+        follow(warm.engine);
+      }
+    }
+    handoffDue = false;
   }
 
   async function start(kind) {
@@ -199,7 +248,7 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
     srcNode.connect(tap); tap.connect(sink); sink.connect(ctx.destination);
     if (demoSrc) { demoSrc.connect(ctx.destination); demoSrc.onended = () => stopListening(); demoSrc.start(); }
     live = { stream, srcNode, tap, sink, demoSrc };
-    mode = 'listening';
+    mode = 'listening'; holdScreen(true);
     setStatus(kind === 'mic' ? 'Listening to your microphone' : kind === 'tab' ? 'Listening to the shared tab' : 'Playing and analyzing the demo song', 'live');
     $('mom-hint').textContent = 'Found as they happen. New sections are confirmed about 9 seconds after they start, then placed at the right time.';
     setButtons();
@@ -207,7 +256,7 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
 
   async function stopListening(reason) {
     if (mode !== 'listening') return;
-    mode = 'stopped';
+    mode = 'stopped'; warm = null; holdScreen(false);
     const L = live; live = null;
     if (L) {
       try { L.srcNode.disconnect(); } catch (e) { }
@@ -217,7 +266,7 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
       if (L.stream) L.stream.getTracks().forEach(t => t.stop());
     }
     engine.finalize();
-    setStatus('Session finished. Click the timeline, the shape or a moment to replay it.', 'done');
+    setStatus(`Session finished${handoffs ? ` after ${longTime(liveBase + engine.time)} of listening. Analysis and replay cover the last ${fmtTime(engine.time)}` : ''}. Click the timeline, the shape or a moment to replay it.`, 'done');
     $('mom-hint').textContent = 'Press Play on any moment to hear it again.';
     summaryDirty = true; shapeDirty = true;
     setButtons();
@@ -232,8 +281,9 @@ registerProcessor('anatomy-tap',AnatomyTap);`;
       const song = AnatomyDemo.render(sr);
       newSession('example', sr, { pitchEvery: 6 });
       mode = 'example';
-      let i = 0; const n = song.L.length, CH = 4096;
+      let i = 0; const n = song.L.length, CH = 4096, mine = engine;
       const step = () => {
+        if (engine !== mine) return;   // another session started before the demo was ready: leave that session alone
         const until = performance.now() + 18;
         while (i < n && performance.now() < until) {
           const L = song.L.subarray(i, i + CH), R = song.R.subarray(i, i + CH);
@@ -1059,6 +1109,16 @@ void main(){
       pausedAt = null; caption(null);
     }
 
+    // Continuous listening: the engine was swapped for one already warmed up on the same sound. Keep the picture
+    // and drop only what was counted in the old engine's frames, seconds and moment ids. The next frame is treated
+    // as a jump, which re-reads the level followers and the slow measurements from the new engine.
+    let adopted = false;
+    function adopt(from, e) {
+      if (S.eng !== from) return;   // Visuals hasn't drawn this session yet: frame() starts it clean
+      S.eng = e; S.lastF = -1; S.lastT = null; S.beatPtr = e.beatTimes.length; S.dropState = e.drop.state;
+      S.seen = new Set(e.moments.map(m => m.id)); adopted = true;
+    }
+
     /* ---------- reading the engine ---------- */
     const bandPow = (e, f, b) => Math.pow(10, e.bands[f * 6 + b] / 10);
     function bassDb(e, f) { return 10 * Math.log10(bandPow(e, f, 0) + bandPow(e, f, 1) + 1e-12); }
@@ -1300,6 +1360,7 @@ void main(){
         // onsets: sudden rises in energy throw shards off the chord
         const f = src.f;
         if (jump || S.lastF < 0 || f - S.lastF > e.fr) S.lastF = f;
+        if (S.lastSpawnF > f) S.lastSpawnF = -1e9;   // the frame count went back: a new session, a handoff or a seek
         for (let ff = S.lastF + 1; ff <= f; ff++) {
           const o = e.onset[ff]; S.onsetMean += (o - S.onsetMean) * 0.02;
           if (e.activeF[ff] && S.onsetMean > 1e-6 && o > 2.3 * S.onsetMean && ff - S.lastSpawnF > e.fr * 0.07) { S.lastSpawnF = ff; S.hits.push(now); onsetShards(o / S.onsetMean); }
@@ -1591,7 +1652,7 @@ void main(){
       const e = engine, k = src.kind;
       const chip = hudEls['vz-chip'];
       chip.dataset.state = k;
-      hudEls['vz-chip-t'].textContent = k === 'live' ? `Live · ${fmtTime(src.t)}` : k === 'replay' ? `Replay · ${fmtTime(src.t)} / ${fmtTime(rec ? rec.dur : 0)}` : k === 'paused' ? `Paused · ${fmtTime(src.t)}` : (mode === 'example' || mode === 'boot') ? 'Preparing the demo…' : e && e.nF ? 'Portrait of the last session' : 'Waiting for sound';
+      hudEls['vz-chip-t'].textContent = k === 'live' ? `Live · ${longTime(liveBase + src.t)}` : k === 'replay' ? `Replay · ${fmtTime(src.t)} / ${fmtTime(rec ? rec.dur : 0)}` : k === 'paused' ? `Paused · ${fmtTime(src.t)}` : (mode === 'example' || mode === 'boot') ? 'Preparing the demo…' : e && e.nF ? 'Portrait of the last session' : 'Waiting for sound';
       const showFeel = k === 'live' || k === 'replay' || k === 'paused';
       hudEls['vz-feel'].hidden = !showFeel;
       if (showFeel) hudEls['vz-feel-w'].textContent = S.mood;
@@ -1715,8 +1776,8 @@ void main(){
       U = Math.min(W, H) * 0.5; CX = W / 2; CY = H / 2;
       if (engine !== S.eng) resetFor(engine);
       const src = pickSource(view);
-      src.jump = !!(lastSrc && lastSrc.t != null && src.t != null && (src.t < lastSrc.t - 0.05 || src.t - lastSrc.t > 0.6)) || (lastSrc && lastSrc.kind !== src.kind && src.kind === 'replay');
-      S.kind = src.kind;
+      src.jump = adopted || !!(lastSrc && lastSrc.t != null && src.t != null && (src.t < lastSrc.t - 0.05 || src.t - lastSrc.t > 0.6)) || (lastSrc && lastSrc.kind !== src.kind && src.kind === 'replay');
+      adopted = false; S.kind = src.kind;
       const T = targets(src, dt, now);
       update(T, dt, now);
       events(src, T, now, dt);
@@ -1726,8 +1787,8 @@ void main(){
       lastSrc = src;
     }
     function onShow() { lastNow = 0; lastSrc = null; }
-    if (/[?&]debug\b/.test(location.search)) window.__vz = { playFrom, pauseReplay, S };
-    return { frame, onShow };
+    if (/[?&]debug\b/.test(location.search)) window.__vz = { playFrom, pauseReplay, S, count: () => ({ parts: parts.length, rings: rings.length }) };
+    return { frame, onShow, adopt };
   })();
 
 
@@ -2483,11 +2544,13 @@ void main(){
     }
     drawLogo();
     if (summaryDirty && mode === 'stopped') renderSummary();
-    if (mode === 'listening' || mode === 'example') $('clock').textContent = fmtTime(engine.time);
+    if (mode === 'listening') $('clock').textContent = longTime(liveBase + engine.time);
+    else if (mode === 'example') $('clock').textContent = fmtTime(engine.time);
     else if (view.mode === 'replay') $('clock').textContent = `▶ ${fmtTime(view.t)}`;
     else $('clock').textContent = fmtTime(engine.time);
     lastViewT = view.mode === 'replay' ? view.t : null;
   }
+  if (/[?&]debug\b/.test(location.search)) window.__live = () => ({ mode, source, handoffs, total: liveBase + (engine ? engine.time : 0), t: engine ? engine.time : 0, warm: warm ? warm.engine.time : null, locked: !!(engine && engine.locked), bpm: engine ? engine.bpm : 0, blocks: engine ? engine.nB : 0, awake: !!wake });
   clearSummary();
   requestAnimationFrame(loop);
   runExample();

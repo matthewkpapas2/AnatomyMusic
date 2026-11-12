@@ -1,13 +1,17 @@
 # Anatomy: status, version log and roadmap
 
-_Last updated: 2026-10-20 (v8: #44, #42 and #43 as PRs #7–#9 on the 10-09 stack). Update this file after every meaningful change. The full v7-era version of this file (with the v6→v7 measurement table) is kept in `history/02-status-2026-10-05.md`._
+_Last updated: 2026-11-12 (v8: PRs #1–#11 are merged and `main` holds the whole 10-20 stack; continuous listening for Visuals is the open PR from `visuals-continuous`). Update this file after every meaningful change. The full v7-era version of this file (with the v6→v7 measurement table) is kept in `history/02-status-2026-10-05.md`._
 
 ## Current version
 **Code: v8 in progress.** v7 (anatomy7.html, 2026-10-05) lives in the repo **`matthewkpapas2/AnatomyMusic`** as `web/`.
-On 2026-10-09 the first intentional changes went in as stacked PRs on the scaffold (PR #1 is still open):
-ear-vs-detector → Fake-out fix → gap-only landings → harness fixes → docs. On 2026-10-20 three more stacked on top
-(#7 `fix-landing-value` → #8 `fix-gap-launches` → #9 `fix-escalator-leadin` → `docs-2026-10-20`); none is merged yet.
-`anatomy7.html` and all older copies in `~/Downloads` are unchanged and stay as they are.
+- **`main` holds the whole 10-20 stack** (`3153808`). Matt merged all ten PRs on 2026-11-12. At first only #1–#3
+  reached `main`: #4–#10 each merged into the branch below them after that branch had already been merged, so they
+  sat on `fix-fakeout-hole`. **PR #11** (`fix-fakeout-hole` → `main`, merged the same day) landed them; `main`'s files
+  now equal the 10-20 top of the stack exactly.
+- **`visuals-continuous`** (2026-11-12, an open PR into `main`): continuous listening for the microphone and tab, a
+  screen wake lock, and two v7 bug fixes.
+- The repo is public as of 2026-11-12 (it was recorded as private on 10-08). No audio or keys are in it.
+- `anatomy7.html` and all older copies in `~/Downloads` are unchanged and stay as they are.
 
 ## Version log
 | Version | Saved (ET) | What changed |
@@ -23,6 +27,40 @@ ear-vs-detector → Fake-out fix → gap-only landings → harness fixes → doc
 | **v8 scaffold** (repo, branch `platform-scaffold`) | 2026-10-08 | **No app-code change.** v7 split into `web/` (proven byte-identical), `server/` (local server, Claude API stub), `data/` (download script + stage plan), `tests/` (regression, song profiles, rebuilt preview harness, manifest), `docs/`. First full measurement of the 20-song test set and the 10 test pairs both ways (`04-results-2026-10-08.md`). |
 | **v8 first changes** (branches `ear-vs-detector` … `docs-2026-10-09`) | 2026-10-09 | `tests/drops-vs-ear.mjs` (ear marks vs `findDrops`); **Fake-out** no longer leaves holes (#39); **gap-only entries stop being landings**, and songs without a confident drop also get section landings (#31); the byte-identity check retires (#38); the harness opens on Mix and no longer crashes on a stuck file chooser (#35 closed as misdiagnosed). Details: `04-results-2026-10-09.md`. |
 | **v8 cleanup** (branches `fix-landing-value` … `docs-2026-10-20`) | 2026-10-20 | The payoff formula is written once (#44, no result changed); **gap-only entries stop being Track 1 build launches** and Silence switch stops promising a drop on them (#42); Build into build's preview skips near-silent lead-ins (#43). Advanced 37 · 96.8 (min 73) → 34 · 97.4 (min 77). Details: `04-results-2026-10-20.md`. |
+| **v8 continuous listening** (branch `visuals-continuous`) | 2026-11-12 | **Microphone and tab listening no longer stops at 10 minutes:** a second engine warms up and takes over, and Visuals keeps its picture. A screen wake lock while listening. Two v7 bugs fixed (the demo-analysis race, onset shards after a session). `tests/live-handoff.mjs`. Details: `04-results-2026-11-12.md`. |
+
+## v8 continuous listening (2026-11-12): what was done and why
+**Matt's ask:** a few DJs want Visuals behind them for a set, and the microphone session stops after 10 minutes.
+
+**Why it stopped:** `MAX_SEC = 600`. A session keeps its whole recording and per-frame history in memory, and the
+Shape compares every half second with every earlier one (about 90 MB at 10 minutes, about 865 MB at an hour, about
+5 GB at three: computed, not measured). So one session can't have no limit.
+
+**What was built** (`web/js/app.js` only; the engine is untouched):
+- 150 s before a microphone or tab session fills, a second engine starts on the same sound. Once it has heard 60 s it
+  takes over, on the next section change if one comes, at the cap otherwise (`handoff()`).
+- Visuals keeps its picture across the handoff (`VZ.adopt()`); a new session would have cleared it.
+- The header clock and the Visuals "Live ·" chip show total listening time (h:mm:ss past an hour).
+- **The cost:** Analysis, replay, the Song DNA card and "send to a Mix deck" cover only the current session (up to 10
+  minutes). The status line says so after the first handoff and after Stop. A whole set can't be reviewed afterwards.
+- A screen wake lock is asked for while listening, so the display doesn't sleep mid-set. Not tested on a real
+  display (tech debt #51).
+
+**Measured** (`04-results-2026-11-12.md`; headless Chromium, the real microphone path, a looping WAV of the demos):
+- Real constants: 20:37 of listening, 2 handoffs (at 515 s and 519 s, both on a section change), the beat locked at
+  the same tempo across each, particles 103 → 104 and 122 → 107, 0 page errors, the JS heap back to 38 MB after each.
+- `--fast` (100 s sessions): 6 handoffs, the same results.
+- Controls: with the Visuals handoff off the picture resets (96 → 2 particles); without the shard fix only 2 of 13
+  samples after a handoff saw onset hits.
+
+**Two v7 bugs found and fixed:**
+- Clicking the microphone before the built-in demo finished analyzing fed the demo song into the microphone session
+  and then stopped it (seen in the first test run: the session clock ran at twice real time).
+- After any session, the next one threw no onset shards until it had run longer than the previous one
+  (`S.lastSpawnF` was never reset). Also hit by seeking backward in a replay.
+
+**Not done, on purpose:** a rolling window inside the engine (a rewrite of code unchanged since v3), and raising
+`MAX_SEC` (Mix decks are still cut at 10 minutes, tech debt #8).
 
 ## v8 cleanup (2026-10-20): what was done and why
 **Matt's pick** (asked at the start, since nothing he owed had arrived: no ear marks, no re-downloads, no Raveform
@@ -117,6 +155,15 @@ the drop detector and profiler on every test song, run the harness on the 10 tes
 
 **v7 verified state (2026-10-05, v7 harness):** Beginner 97 (80), Intermediate 96 (74), Advanced 95 (83); per pair B/I/A: Kelly→Bieber 98/92/99, John→Bieber 97/95/92, Kelly→Drake 95/95/92, demo 98/100/96; compatibility 87 / 89 / 73 / 93; UI smoke test 0 page errors at 1400 and 390 px.
 
+## Verified state (2026-11-12, `visuals-continuous`)
+- **`npm test`:** single-file build OK; 5/5 server tests; 15/15 regression checks (before and after).
+- **`npm run test:live`** (real constants, about 21 minutes): all 14 checks pass. `-- --fast`: 6 handoffs; every check
+  passed except one clock check whose tolerance was wrong (fixed in the test, not re-run in `--fast`).
+- **The pair harness wasn't run:** `web/js/mix.js` and the preview renderer are unchanged, so the 10-20 numbers below
+  stand. Run it before the next `mix.js` change as usual.
+- **Not verified:** how a handoff looks on a real screen, a run longer than 21 minutes, a real microphone, the wake
+  lock on a real display.
+
 ## Verified state (2026-10-20, top of the stack)
 - **`npm test`:** single-file build OK; 5/5 server tests; 15/15 regression checks.
 - **Harness, 10 test pairs × 2 directions:** Beginner 137 · 96.2 (min 0), Intermediate 96 · 94.4 (min 69), Advanced
@@ -149,7 +196,7 @@ the drop detector and profiler on every test song, run the harness on the 10 tes
 5. `f0F`/`trackNote` naming is a v2 holdover.
 6. **The mood estimate is crude.**
 7. **File input only exists on the Mix tab.**
-8. **Sessions and Mix decks are capped at 600 s.** Now it bites: Strobe (10:37) is analyzed only to 10:00.
+8. **Sessions and Mix decks are capped at 600 s.** Now it bites: Strobe (10:37) is analyzed only to 10:00. **2026-11-12:** microphone and tab listening no longer stops at the cap (it hands over to a new session); each session and every Mix deck is still capped at 600 s.
 9. **Engine timestamps are early/late.** Chords still use `CHORD_LAG`.
 10. **Mix analysis runs on the main thread.**
 11. **Section roles and local keys are heuristics.**
@@ -227,6 +274,32 @@ the drop detector and profiler on every test song, run the harness on the 10 tes
 47. **NEW (2026-10-20): Silence switch on a gap-only stop keeps tension 0.9,** the same as a silence before a real drop.
     A judgment call measured on one idea (Latch 1:51, 100); the dataset phase should say whether a mid-chorus stop
     deserves it.
+48. **NEW (2026-11-12): continuous listening forgets.** After a handoff, Analysis, replay, the Song DNA card and
+    "send to a Mix deck" cover only the current session (60 s to 10 minutes). Keeping a whole set would mean writing
+    audio and measurements to disk, or a rolling window in the engine. Not designed.
+49. **NEW (2026-11-12): the handoff timings are judgment calls.** `WARM_LEAD` 150 s and `WARM_MIN` 60 s come from one
+    synthetic song (beat lock 4.4–8.5 s, key 5 s, first section 17.5–29 s). Real club audio through a microphone may
+    lock more slowly.
+50. **NEW (2026-11-12): a handoff restarts the section letters and the repetition memory.** The new engine starts from
+    section A and knows only its own 60–150 s, so Visuals can change section color at a handoff and "echo" can't see
+    further back. Handoffs wait for a section change so this lands on a real change; whether it's noticeable is
+    untested by eye.
+51. **NEW (2026-11-12): the screen wake lock is untested on a real display.** Headless Chromium refuses it by
+    default, so the long test runs never held it. With the permission granted it's held while listening and released
+    on Stop (checked once by hand, not in the repo's tests). Where Chrome doesn't grant it, the display follows the
+    Mac's sleep setting.
+52. **NEW (2026-11-12): `tests/live-handoff.mjs --fast` rewrites three constants in `app.js` by text** as the page
+    loads. It fails loudly if those lines change, but it's a second place that knows them.
+53. **NEW (2026-11-12): the "Reached the 10-minute limit" stop can't be reached today.** Microphone and tab sessions
+    hand over before they fill, and the demo is shorter than a session. It stays as the guard for a session that
+    fills with no engine warming up (otherwise the picture would freeze silently).
+54. **NEW (2026-11-12): two more debug read-outs** behind `?debug`: `window.__live()` and `window.__vz.count()`, used
+    by `tests/live-handoff.mjs`.
+55. **NEW (2026-11-12): Visuals pauses when its tab is hidden** (the browser stops `requestAnimationFrame`; listening
+    continues). For a set, Visuals needs its own window on the projector's display. Not changed.
+56. **NEW (2026-11-12): the engine re-locks the beat at a song change.** In the 21-minute run, 14 of 236 samples were
+    unlocked or off-tempo (5 before any handoff), where the looped test file jumps between songs. A DJ's blended
+    transitions aren't the same case; how the beat lock behaves through a real set is unmeasured.
 
 ## Decisions
 - **2026-10-05:** lyrics parked until drops are solid (lrclib works from a page in Chrome); the Spotify API is unusable
@@ -256,6 +329,14 @@ the drop detector and profiler on every test song, run the harness on the 10 tes
     silence is its premise and the one such idea measures 100. Same reasoning as #31, but scoped to what the label claims.
   - #8 and #9 should merge together (#8 alone makes one idea worse; #9 fixes it).
   - Mistakes found by recounting are fixed in PR descriptions, comments and docs, not by force-pushing pushed branches.
+
+- **2026-11-12:**
+  - Matt wants Visuals to last a DJ set. Chosen: hand over to a warmed-up engine (bounded memory, the engine
+    untouched) over raising the cap (memory grows with the square of the length) or a rolling window in the engine (a
+    rewrite). The cost is accepted for now: Analysis and replay keep only the current session (#48).
+  - The handoff applies to every microphone and tab session, with no setting: a toggle would be one more thing to get
+    wrong at a gig. Before, such a session stopped at 10:00 and kept its first 10 minutes; now it keeps the last ones.
+  - No more stacked PRs: new PRs target `main`.
 
 ## Advanced proposals for same-tempo, same-key house (#27, 2026-10-09; not built)
 Each lands on Track 2's drop and uses only what previews can already render (clips, fader, 3-band kill EQ, filters,
@@ -292,6 +373,10 @@ Not proposed: a rewind (Spinback already does it), a manufactured stop (Cut / Ta
   has download, alignment and EQ-estimation code (Python 3.9).
 
 ## Next steps
+0. **Matt:** review and merge the `visuals-continuous` PR. Then try Visuals on the real setup before a gig: `npm start`, open `http://127.0.0.1:5173`, microphone (or the mixer's
+   output through an audio interface), full screen (F), hide text (H), and leave it for 30+ minutes. Watch a handoff
+   (the first comes between 8:30 and 10:00), check the display stays awake, and look at Chrome's Task Manager for
+   memory.
 1. **Matt:** paste the ear marks (`03-test-songs.md` has the list; also Rihanna 1:31, Animals 1:07, Pipe Down 0:06 / 0:12),
    then `npm run test:ear -- --report` (or the next session runs it). Review the stacked PRs, scaffold first.
 2. **Matt:** re-download Losing It, Drugs From Amsterdam and Opus as the Extended / Original Mix.
@@ -322,5 +407,8 @@ Not proposed: a rewind (Spinback already does it), a manufactured stop (Cut / Ta
 - **2026-10-09:** Baseline reproduced exactly; ear-vs-detector script (marks pending); Fake-out holes fixed (two causes);
   gap-only landings stopped, with a wider section fallback; byte identity retired; #35 closed as misdiagnosed; harness
   crash fixed; Advanced proposals written; the v7 workspace archive found. Five stacked PRs.
+- **2026-11-12:** Matt merged all ten PRs (only #1–#3 reached `main` at first; PR #11 landed the rest). Matt's ask:
+  Visuals for DJ sets. Continuous listening built and measured (2 handoffs at real length, 6 at `--fast`, two controls); a wake
+  lock; two v7 bugs fixed; `tests/live-handoff.mjs`.
 - **2026-10-20:** Nothing new from Matt; baseline reproduced exactly; #44 (no-op, proven), #42 (gap-only launches, 27
   measured) and #43 (Build into build lead-in) as PRs #7–#9; Advanced 34 · 97.4 (min 77). One workspace restart.
