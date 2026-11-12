@@ -8,7 +8,7 @@ drop-first transition planner for DJs. Load two songs and it scores how well the
 Beginner, Intermediate and Advanced transitions that land on the next song's drop. It suggests; the DJ performs.
 
 This repo is the **platform phase (v8)**: the v7 single-file page (`anatomy7.html`) split into files, a small local
-server, a dataset pipeline and a test suite. The UI is byte-for-byte v7 (`npm test` proves it).
+server, a dataset pipeline and a test suite. The UI started as v7 split into files (proven byte for byte until the first v8 change on 2026-10-09).
 
 ## Run it
 
