@@ -1,15 +1,15 @@
 # Anatomy: status, version log and roadmap
 
-_Last updated: 2026-11-12 (v8: continuous listening for Visuals, branch `visuals-continuous`; PRs #4–#10 are merged but not on `main` yet). Update this file after every meaningful change. The full v7-era version of this file (with the v6→v7 measurement table) is kept in `history/02-status-2026-10-05.md`._
+_Last updated: 2026-11-12 (v8: PRs #1–#11 are merged and `main` holds the whole 10-20 stack; continuous listening for Visuals is the open PR from `visuals-continuous`). Update this file after every meaningful change. The full v7-era version of this file (with the v6→v7 measurement table) is kept in `history/02-status-2026-10-05.md`._
 
 ## Current version
 **Code: v8 in progress.** v7 (anatomy7.html, 2026-10-05) lives in the repo **`matthewkpapas2/AnatomyMusic`** as `web/`.
-- **`main` has PRs #1–#3 only** (the scaffold, ear-vs-detector, the Fake-out fix). Matt merged all ten PRs on
-  2026-11-12, but #4–#10 each merged into the branch below them after that branch had already been merged, so they
-  ended up on `fix-fakeout-hole`, not `main`. A PR from `fix-fakeout-hole` into `main` lands them (no conflicts; the
-  result is exactly the 10-20 top of the stack).
-- **`visuals-continuous`** (2026-11-12) branches from `fix-fakeout-hole`: continuous listening for the microphone and
-  tab, a screen wake lock, and two v7 bug fixes. Its PR targets `main`; merge the `fix-fakeout-hole` PR first.
+- **`main` holds the whole 10-20 stack** (`3153808`). Matt merged all ten PRs on 2026-11-12. At first only #1–#3
+  reached `main`: #4–#10 each merged into the branch below them after that branch had already been merged, so they
+  sat on `fix-fakeout-hole`. **PR #11** (`fix-fakeout-hole` → `main`, merged the same day) landed them; `main`'s files
+  now equal the 10-20 top of the stack exactly.
+- **`visuals-continuous`** (2026-11-12, an open PR into `main`): continuous listening for the microphone and tab, a
+  screen wake lock, and two v7 bug fixes.
 - The repo is public as of 2026-11-12 (it was recorded as private on 10-08). No audio or keys are in it.
 - `anatomy7.html` and all older copies in `~/Downloads` are unchanged and stay as they are.
 
@@ -336,7 +336,7 @@ the drop detector and profiler on every test song, run the harness on the 10 tes
     rewrite). The cost is accepted for now: Analysis and replay keep only the current session (#48).
   - The handoff applies to every microphone and tab session, with no setting: a toggle would be one more thing to get
     wrong at a gig. Before, such a session stopped at 10:00 and kept its first 10 minutes; now it keeps the last ones.
-  - No more stacked PRs: both new PRs target `main`.
+  - No more stacked PRs: new PRs target `main`.
 
 ## Advanced proposals for same-tempo, same-key house (#27, 2026-10-09; not built)
 Each lands on Track 2's drop and uses only what previews can already render (clips, fader, 3-band kill EQ, filters,
@@ -373,8 +373,7 @@ Not proposed: a rewind (Spinback already does it), a manufactured stop (Cut / Ta
   has download, alignment and EQ-estimation code (Python 3.9).
 
 ## Next steps
-0. **Matt:** merge the `fix-fakeout-hole` → `main` PR (lands #4–#10), then the `visuals-continuous` PR. Then try
-   Visuals on the real setup before a gig: `npm start`, open `http://127.0.0.1:5173`, microphone (or the mixer's
+0. **Matt:** review and merge the `visuals-continuous` PR. Then try Visuals on the real setup before a gig: `npm start`, open `http://127.0.0.1:5173`, microphone (or the mixer's
    output through an audio interface), full screen (F), hide text (H), and leave it for 30+ minutes. Watch a handoff
    (the first comes between 8:30 and 10:00), check the display stays awake, and look at Chrome's Task Manager for
    memory.
@@ -408,8 +407,8 @@ Not proposed: a rewind (Spinback already does it), a manufactured stop (Cut / Ta
 - **2026-10-09:** Baseline reproduced exactly; ear-vs-detector script (marks pending); Fake-out holes fixed (two causes);
   gap-only landings stopped, with a wider section fallback; byte identity retired; #35 closed as misdiagnosed; harness
   crash fixed; Advanced proposals written; the v7 workspace archive found. Five stacked PRs.
-- **2026-11-12:** Matt merged all ten PRs (only #1–#3 reached `main`; found and a PR opened). Matt's ask: Visuals for
-  DJ sets. Continuous listening built and measured (2 handoffs at real length, 6 at `--fast`, two controls); a wake
+- **2026-11-12:** Matt merged all ten PRs (only #1–#3 reached `main` at first; PR #11 landed the rest). Matt's ask:
+  Visuals for DJ sets. Continuous listening built and measured (2 handoffs at real length, 6 at `--fast`, two controls); a wake
   lock; two v7 bugs fixed; `tests/live-handoff.mjs`.
 - **2026-10-20:** Nothing new from Matt; baseline reproduced exactly; #44 (no-op, proven), #42 (gap-only launches, 27
   measured) and #43 (Build into build lead-in) as PRs #7–#9; Advanced 34 · 97.4 (min 77). One workspace restart.

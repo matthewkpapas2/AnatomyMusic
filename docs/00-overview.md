@@ -59,7 +59,7 @@ itself still has no build step and no dependencies apart from Google Fonts, and 
    `tests/songs.local.json`), then `npm run test:songs` / `npm run test:ear` / `npm run test:pairs` as needed. In the cloud workspace,
    `npm i` is replaced by symlinking `/opt/npm-tools/node_modules/playwright{,-core}` into `node_modules/`.
 5. After a meaningful change: a branch, small described commits, a PR into `main`; update `02` and the results doc.
-   Don't stack PRs on each other: on 2026-11-12 a ten-deep stack was merged and only the bottom three reached `main`.
+   Don't stack PRs on each other: on 2026-11-12 a ten-deep stack was merged and only the bottom three reached `main` (PR #11 landed the rest).
    Use `gh api` (REST); GraphQL is blocked from these sessions.
 
 ## Working rules (Matt wants these explicit)
