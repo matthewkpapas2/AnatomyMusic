@@ -1,6 +1,6 @@
 # Anatomy: architecture (v7 code in the v8 repo layout)
 
-_Last updated: 2026-10-20. The app code is v7 plus the v8 changes (Fake-out, landings, launches, payoff; `docs/02`). Line numbers
+_Last updated: 2026-11-12. The app code is v7 plus the v8 changes (Fake-out, landings, launches, payoff, continuous listening; `docs/02`). Line numbers
 refer to the files in `web/` and drift with each change._
 
 ## Repo layout
@@ -11,10 +11,10 @@ refer to the files in `web/` and drift with each change._
 | `web/js/engine.js` | **AnatomyEngine** (892 lines) | v7 script 1. Pure JS, no DOM, Node-exportable. Unchanged since v3. |
 | `web/js/demo.js` | **AnatomyDemo** (178 lines) | v7 script 2. Synth songs with known answers. Unchanged since v5. |
 | `web/js/mix.js` | **AnatomyMix** (1,742 lines) | v7 script 3. Pure JS, no DOM, Node-exportable. |
-| `web/js/app.js` | **App** (2,495 lines) | v7 script 4: audio I/O, Analysis drawing, `VZ` visuals, the `MX` Mix UI and preview renderer, tabs, main loop. |
+| `web/js/app.js` | **App** (2,558 lines) | v7 script 4: audio I/O, Analysis drawing, `VZ` visuals, the `MX` Mix UI and preview renderer, tabs, main loop. |
 | `server/index.mjs` | Local server | Node ≥ 20.12, no dependencies, 127.0.0.1 only. Serves `web/`; `GET /api/health`; `POST /api/creative` is a stub (501) for the future Claude call. Reads a gitignored `.env` (`ANTHROPIC_API_KEY`, `PORT`). |
 | `data/` | Dataset pipeline | `download/get_subset.py` (run on the Mac), `pipeline/status.py`, `README.md` with the stage plan. `raw/`, `work/` and `out/` are gitignored. |
-| `tests/` | Test suite | `regression.mjs`, `profile-songs.mjs`, `drops-vs-ear.mjs` (+ `lib/drop-rules.mjs`), `measure/` (preview harness), `unit/` (server), `lib/`, `songs.manifest.json`. See `docs/testing.md`. |
+| `tests/` | Test suite | `regression.mjs`, `profile-songs.mjs`, `drops-vs-ear.mjs` (+ `lib/drop-rules.mjs`), `measure/` (preview harness), `live-handoff.mjs` (continuous listening), `unit/` (server), `lib/`, `songs.manifest.json`. See `docs/testing.md`. |
 | `tools/build-single.mjs` | Inlines `web/` into one HTML file | `npm test` runs it so the single-file build keeps working. The byte-identity `--check` retired on 2026-10-09 |
 
 The four scripts still share one global scope: each is a classic script with a top-level `const` (`AnatomyEngine`,
@@ -83,6 +83,33 @@ chordNotes, timeStretch, songTime, TECH, LEVEL_NAME, SOUND_FLOOR, floorOf, secNa
 secAt, energy, chordAt, phraseAt, audioFeatures, kWeightedLufs, envVal`, plus `_internal` (`nearestIn, tempoRelation,
 crossSim, landings, launches, soundCheck, finish, gens()`).
 
+## App (`web/js/app.js`), listening sessions
+- **A session** is one `Engine` plus one `Recorder` (16-bit mono, for replay), both sized for `MAX_SEC` = 600 s.
+  `newSession()` makes them; `follow(engine)` wires the engine's events to the page. `ingest(L, R)` feeds both from the
+  audio worklet (1024-sample chunks).
+- **Why a session can't just grow:** at 48 kHz the recording is 5.8 MB a minute, the per-frame history (the
+  spectrogram above all) 1.8 MB a minute, and the Shape's similarity rows grow with the square of the length (12 MB
+  with their image at 10 minutes, about 415 MB at an hour). Computed from the array sizes, not measured.
+- **Continuous listening (v8, microphone and tab only).** When the session reaches `MAX_SEC − WARM_LEAD` (450 s),
+  `ingest()` starts a second engine and recorder (`warm`) and feeds both. Once the warm engine has heard `WARM_MIN`
+  (60 s), `handoff()` makes it the session: on the current engine's next `section` event if one comes, otherwise when
+  the current engine is full. So a session lasts 510–600 s and the next one starts 60–150 s in.
+  - `handoff()` swaps `engine` and `rec`, adds the difference to `liveBase` (seconds listened before the current
+    engine's 0:00; the header clock and the Visuals "Live ·" chip show `liveBase + engine.time`), resets what the
+    Analysis page caches per engine, and calls `VZ.adopt(from, engine)`.
+  - `VZ.adopt()` keeps the picture (particles, rings, colors) and drops only what was counted in the old engine's
+    frames, seconds and moment ids. The next frame is treated as a jump, which re-reads the level followers and slow
+    measurements from the new engine. (A new session goes through `resetFor()` instead, which clears the picture.)
+  - A warming engine's events are ignored (`follow()` checks `e !== engine`).
+  - **What's lost:** everything before the new engine's start. Analysis, replay, the Song DNA card and "send to a Mix
+    deck" cover the current session only. The status line says so after the first handoff and after Stop.
+  - The demo song and the built-in example never hand off (they're shorter than a session).
+- **Screen wake lock:** `holdScreen()` asks for `navigator.wakeLock` while listening and again when the page becomes
+  visible (Chrome drops it when the page is hidden). No-op where the API is missing or refused.
+- **The built-in example** (`runExample()`, analyzed at page load) stops feeding if another session starts before it
+  finishes; the demo button then reads "Play the demo song" and plays it live.
+- Debug: `?debug` exposes `window.__live()` (mode, handoffs, clocks, beat lock) and `window.__vz` (`S`, `count()`).
+
 ## App (`web/js/app.js`), Mix (`MX`)
 - File decks: `loadFile` → `decodeAudioData` (the AudioContext's rate) → `pump()`: an Engine with `pitchEvery: 6`, fed
   4096-sample chunks in 22 ms slices on `setTimeout`, then `profile`. `MAX_SEC` = 600: longer files are analyzed for
@@ -107,4 +134,5 @@ turned up on 2026-10-09** in `~/Downloads/anatomy-v7-workspace.tar.gz`, but are 
 | `run.js` + `meas_page.js` | `tests/measure/run.mjs` + `meas_page.js`, **rebuilt with a new, documented score rule** |
 | `why.js` | not rebuilt (the harness JSON keeps every skipped idea and its reason) |
 | `ui_smoke.js`, `shots.js` | not rebuilt yet (tech debt #33) |
+| (none) | `tests/live-handoff.mjs`: continuous listening on the real microphone path (new in v8) |
 | `lyr.js` (parked lyrics) | not in the repo; lyrics stay parked |

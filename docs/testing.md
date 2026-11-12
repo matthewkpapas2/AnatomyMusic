@@ -1,6 +1,6 @@
 # Testing
 
-Five layers, from fastest to slowest. Run the first one before every commit that touches `web/`, and the harness
+Six layers, from fastest to slowest. Run the first one before every commit that touches `web/`, and the harness
 before and after every change to `web/js/mix.js` (the baseline must first reproduce the latest results doc).
 
 | Command | What it proves | Needs |
@@ -10,6 +10,7 @@ before and after every change to `web/js/mix.js` (the baseline must first reprod
 | `npm run test:ear` | `findDrops` against Matt's by-ear drop marks (`ear` in the manifest): hits, misses, false drops, timing in beats, which rule failed | same |
 | `npm run test:pairs` | Every suggested idea on the 10 test pairs (both directions), rendered and measured | Playwright Chromium, the songs |
 | `node tests/measure/run.mjs --reference` | The pairs v7 was verified on (Kelly→Bieber, John→Bieber, Kelly→Drake, demo) | same |
+| `npm run test:live` (`-- --fast` for 6 minutes instead of 21) | Continuous listening: the microphone path keeps going past several session handoffs | Playwright Chromium |
 
 ## Where the songs come from
 `tests/songs.manifest.json` lists every test song by id, with its filename, the published BPM/key/length, notes on the
@@ -99,3 +100,45 @@ branches, give each its own `git worktree` (with the `playwright` symlinks and `
 harness serves `web/` live from the checkout it runs in: editing that checkout mid-run changes the code later pairs load.
 
 Output: `tests/out/pairs/<a>__<b>.json` (everything, per idea) and `tests/out/pairs.md` (the summary table).
+
+## 5. Continuous listening (`tests/live-handoff.mjs`)
+Run it after any change to sessions, `ingest()`, `handoff()` or the Visuals event code in `web/js/app.js`.
+
+It opens the page in headless Chromium with Chromium's fake capture device playing a looping WAV of the two demo songs
+(written to `tests/out/`), clicks "Visualize the microphone" as soon as the page loads, and samples the page every 5 s.
+So it exercises the real path: `getUserMedia`, the audio worklet, `ingest()`, the engines and Visuals. It needs no
+songs.
+
+| Mode | Sessions | Run length | Handoffs needed |
+|---|---|---|---|
+| `npm run test:live` | the real constants: 600 s, warm-up starts 150 s before the end, takes over after 60 s | about 21 minutes | 2 |
+| `npm run test:live -- --fast` | 100 s / 50 s / 20 s | about 6 minutes | 3 |
+
+`--fast` rewrites the three constants in `app.js` as the page loads it (Playwright request interception). Nothing in
+`web/` changes, and the run fails loudly if the constant lines no longer read as expected.
+
+| Check | How |
+|---|---|
+| No page errors; still listening at the end | `pageerror` events; the page's `mode` |
+| The listening clock follows the wall clock | total listened vs. elapsed time, within 8 s |
+| The session never outgrows the cap | every sample's session time |
+| Each handoff: the beat stays locked | locked on the frame before and the frame after, tempo within 1 BPM |
+| Each handoff: the picture is kept | particles on the frame after are at least 25% of the frame before |
+| Each handoff: the listening clock doesn't jump | the clock's advance between those two frames matches the time between them |
+| Memory is level | peak JS heap in the last session vs. the first one after a handoff |
+| Onset shards keep firing | at least half the samples after a handoff saw hits in the last 2.5 s |
+| Stopping says what the Analysis covers | the status line after Stop |
+
+**The 25% line and the shard check were calibrated with two controls** (2026-11-12, `--fast`, one handoff feature
+switched off by the same request rewriting; not kept in the repo). Headless Chromium draws Visuals in software at about
+3 frames a second, so particles fade between two frames even when nothing is wrong:
+
+| | Particles: frame before → frame after | Samples with onset hits after a handoff |
+|---|---|---|
+| The shipped code (6 handoffs) | 116 → 117, 97 → 96, 167 → 139, 175 → 153, 494 → 468, 155 → 147 | 46 of 51 |
+| Visuals handoff switched off (the picture resets like a new session) | 96 → 2, 135 → 1 | 13 of 13 |
+| The `lastSpawnF` line removed (v7's behavior) | 89 → 96, 324 → 121 | 2 of 13 |
+
+**What it can't tell you:** how the handoff *looks*. It counts particles and reads the beat lock; it doesn't judge
+whether a section color changing at a handoff is noticeable. That needs eyes on a real screen. The debug read-outs it
+uses are `window.__live()` and `window.__vz.count()` (both only with `?debug`).

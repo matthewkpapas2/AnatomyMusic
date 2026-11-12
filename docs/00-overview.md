@@ -1,6 +1,6 @@
 # Anatomy: project overview
 
-_Last updated: 2026-10-20 (v8: the code changes so far, Fake-out, gap-only landings and launches, and the payoff cleanup, are PRs #2–#9 stacked on the scaffold). Read this first in any new Anatomy session._
+_Last updated: 2026-11-12 (v8: Fake-out, gap-only landings and launches, the payoff cleanup, and continuous listening for Visuals; see `02` for what is on `main`). Read this first in any new Anatomy session._
 
 ## What it is
 Anatomy is a web app that listens to sound in the browser and shows it three ways:
@@ -27,13 +27,16 @@ itself still has no build step and no dependencies apart from Google Fonts, and 
 ## Inputs
 1. **Microphone** (`getUserMedia`)
 2. **Browser tab** (`getDisplayMedia` with tab audio)
+
+   Since 2026-11-12 these two listen for as long as you like (a DJ set): Visuals keeps going, while Analysis and
+   replay keep only the most recent stretch, up to 10 minutes (`01-architecture.md`, "listening sessions").
 3. **Built-in demo songs** (synthesized, with known answers):
    - Demo 1 "Gear Change": 122 BPM, A minor → B minor, a drop at 62.95 s after a one-beat silence.
    - Demo 2 "Night Drive": 126 BPM, E minor, a synthesized "singer", drops at 38.10 and 76.19 s.
 4. **Audio files** (Mix tab only).
 
 ## Where things live
-- **Repo: `github.com/matthewkpapas2/AnatomyMusic`** (private). `main` started as a README stub; the platform scaffold
+- **Repo: `github.com/matthewkpapas2/AnatomyMusic`** (public as of 2026-11-12). `main` started as a README stub; the platform scaffold
   arrived as a PR from `platform-scaffold`. Layout: `web/` (the app), `server/`, `data/`, `tests/`, `tools/`, `docs/`
   (these docs, plus `testing.md` and the results). See `01-architecture.md`.
 - **Matt's Mac, `~/Downloads/`:** `anatomy.html` … `anatomy7.html`, kept as they are (never overwritten). `anatomy7.html`
@@ -50,12 +53,14 @@ itself still has no build step and no dependencies apart from Google Fonts, and 
 1. Read these docs: `00-overview`, `01-architecture`, `02-status-and-roadmap`, `testing`, and the latest `04-results-*`.
 2. Attach the repo (`matthewkpapas2/AnatomyMusic`, push access; the Claude GitHub App is installed on it) and clone it.
 3. Run `npm test` before changing anything (the single-file build, server tests, the demo regression). Then measure:
-   the harness baseline must match the latest results doc before a change is judged against it.
+   the harness baseline must match the latest results doc before a `mix.js` change is judged against it, and
+   `npm run test:live` covers the listening sessions.
 4. If the session is linked to Matt's computer, stage the songs from `~/Downloads` and set `ANATOMY_SONGS` (or
    `tests/songs.local.json`), then `npm run test:songs` / `npm run test:ear` / `npm run test:pairs` as needed. In the cloud workspace,
    `npm i` is replaced by symlinking `/opt/npm-tools/node_modules/playwright{,-core}` into `node_modules/`.
-5. After a meaningful change: a branch, small described commits, a PR; update `02` and the results doc. While PR #1
-   is open, new PRs stack on it (each targets the branch before it). Use `gh api` (REST); GraphQL is blocked from these sessions.
+5. After a meaningful change: a branch, small described commits, a PR into `main`; update `02` and the results doc.
+   Don't stack PRs on each other: on 2026-11-12 a ten-deep stack was merged and only the bottom three reached `main`.
+   Use `gh api` (REST); GraphQL is blocked from these sessions.
 
 ## Working rules (Matt wants these explicit)
 - **No silent technical debt.** Say any workaround or duplicate in the reply *and* log it in the status doc. **Remove dead code instead of leaving it dormant.** Pipeline stages get scripts when they're built, not as empty stubs.
