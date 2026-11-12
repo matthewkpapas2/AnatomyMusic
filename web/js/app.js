@@ -1301,6 +1301,7 @@ void main(){
         // onsets: sudden rises in energy throw shards off the chord
         const f = src.f;
         if (jump || S.lastF < 0 || f - S.lastF > e.fr) S.lastF = f;
+        if (S.lastSpawnF > f) S.lastSpawnF = -1e9;   // the frame count went back: a new session, a handoff or a seek
         for (let ff = S.lastF + 1; ff <= f; ff++) {
           const o = e.onset[ff]; S.onsetMean += (o - S.onsetMean) * 0.02;
           if (e.activeF[ff] && S.onsetMean > 1e-6 && o > 2.3 * S.onsetMean && ff - S.lastSpawnF > e.fr * 0.07) { S.lastSpawnF = ff; S.hits.push(now); onsetShards(o / S.onsetMean); }
