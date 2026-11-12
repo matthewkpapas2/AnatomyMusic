@@ -1,11 +1,12 @@
 # Testing
 
-Four layers, from fastest to slowest. Run the first one before every commit that touches `web/`.
+Five layers, from fastest to slowest. Run the first one before every commit that touches `web/`.
 
 | Command | What it proves | Needs |
 |---|---|---|
 | `npm test` | `web/` inlines back to anatomy7.html byte for byte; server routes; engine + mixer regression on the demo songs | Node ≥ 20.12 |
 | `npm run test:songs` | Tempo, key and drops for every song in the manifest, against published values | ffmpeg, the songs |
+| `npm run test:ear` | `findDrops` against Matt's by-ear drop marks (`ear` in the manifest): hits, misses, false drops, timing in beats, which rule failed | same |
 | `npm run test:pairs` | Every suggested idea on the 10 test pairs (both directions), rendered and measured | Playwright Chromium, the songs |
 | `node tests/measure/run.mjs --reference` | The pairs v7 was verified on (Kelly→Bieber, John→Bieber, Kelly→Drake, demo) | same |
 
@@ -36,6 +37,25 @@ details). Output: `tests/out/profiles.json` and `profiles.md`. Key comparison: m
 / neighbor (one step on the Camelot wheel) / different. Tempo: match, or at half/double/3:2 time. **Gap-only entries**
 (the engine's silence-before-impact moments with no bass return: confidence 0.30, impact 0) are counted apart from
 drops and hits, because on house tracks they fire at most 8-bar phrase ends.
+
+## 3b. Drops vs. ear marks (`tests/drops-vs-ear.mjs`)
+Each song's `ear` field in the manifest is a list of `m:ss` times where Matt hears a drop (`[]` = listened, no drop;
+no field = not marked yet). The script analyzes each song in Node like `test:songs` does and caches the drops and the
+detector's bar measurements in `tests/out/drops/`. Then `--report` re-scores the cache instantly whenever the marks
+change.
+
+| Term | Meaning |
+|---|---|
+| Hit | a detected drop or hit within `--tol` beats (default 2: ear marks are to the second, about 2 beats) |
+| Misplaced | `--tol` to `--near` beats away (default 8): the right moment, but the wrong bar or a bad grid |
+| Miss | an ear mark with nothing within `--near` beats. The report shows each rule's numbers at the nearest bars and says which threshold blocked it, or that a rule fired and lost to a stronger drop |
+| False | a detection with no ear mark within `--near` beats, with the rule that fired and its confidence |
+| Gap-only | counted apart: how many sit on an ear mark, how many on a mark no real drop caught, how many on nothing |
+
+Timing error is detector minus ear, in beats (+ = the detector is late). The bar measurements come from
+`tests/lib/drop-rules.mjs`, a mirror of `findDrops()` that keeps every candidate, because `findDrops()` only returns
+the winners (tech debt #41). The mirror checks itself: a song is skipped, and the run fails, unless its winners are
+exactly the app's drops.
 
 ## 4. The preview harness (`tests/measure/`)
 `run.mjs` starts `server/`, opens the page in headless Chromium with `?debug`, loads both songs through the real file
