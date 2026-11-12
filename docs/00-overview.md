@@ -1,6 +1,6 @@
 # Anatomy: project overview
 
-_Last updated: 2026-10-09 (v8: the first code changes, Fake-out and gap-only landings, are PRs stacked on the scaffold). Read this first in any new Anatomy session._
+_Last updated: 2026-10-20 (v8: the code changes so far, Fake-out, gap-only landings and launches, and the payoff cleanup, are PRs #2–#9 stacked on the scaffold). Read this first in any new Anatomy session._
 
 ## What it is
 Anatomy is a web app that listens to sound in the browser and shows it three ways:
