@@ -91,4 +91,11 @@ on the 2-core cloud workspace; under extra load a deck button click can time out
 2026-10-09). Re-run that direction on its own (`node tests/measure/run.mjs a:b`); results are deterministic to about
 1e-5 dB, so a re-run is comparable.
 
+**Run one harness at a time, with nothing heavy beside it** (2026-10-20): a full run is about 14–18 minutes with
+`--jobs 2`. With a Node song analysis running alongside, the workspace restarted once (a process killed, exit 137,
+most likely memory). One at a time, 4 full runs had no timeouts. A full run's `tests/out/pairs/` is the before/after
+record, so copy it somewhere outside `tests/out/` before the next run overwrites it. When testing several stacked
+branches, give each its own `git worktree` (with the `playwright` symlinks and `tests/songs.local.json`), because the
+harness serves `web/` live from the checkout it runs in: editing that checkout mid-run changes the code later pairs load.
+
 Output: `tests/out/pairs/<a>__<b>.json` (everything, per idea) and `tests/out/pairs.md` (the summary table).
