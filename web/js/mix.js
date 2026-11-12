@@ -730,16 +730,8 @@ const AnatomyMix = (() => {
     x.level = x.level || tech.level; x.name = tech.name; x.hook = x.hook || tech.hook;
     x.idea = clamp(x.score);
     x.check = soundCheck(C, x);
-    // v7: payoff = how hard the transition lands. A drop landing counts most: how big Track 2's drop is, how much
-    // tension Track 1 hands it (the end of a build beats the end of a chorus), and how much the low end actually
-    // jumps at the landing in this plan. Sound decides first (the check is also a pass/fail floor).
-    const L = x.landing;
-    if (x.land != null && L) {
-      const landV = clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0));
-      const jump = x.check.contrast == null ? 0 : clamp(x.check.contrast / 12);
-      x.payoff = clamp(0.4 * landV + 0.25 * (x.tension == null ? 0.5 : x.tension) + 0.35 * jump);
-    } else x.payoff = clamp(0.3 + 0.3 * x.idea);
-    x.score = clamp(0.55 * x.check.total + 0.45 * x.payoff); x.fit = Math.round(1 + 4 * x.score);
+    x.payoff = payoffOf(x, x.check.contrast);
+    x.score = rankOf(x.check, x.payoff); x.fit = Math.round(1 + 4 * x.score);
     x.id = `${x.tech}-${Math.round(x.cueA * 10)}-${Math.round(x.cueB * 10)}`;
     const prep = [];
     const pb = x.plan.decks[1];
@@ -826,7 +818,11 @@ const AnatomyMix = (() => {
   // end of a phrase (section starts and 8-bar lines in its later part)
   function launches(C, minFrac = 0.42) {
     const A = C.A, bar = barLen(A), end = lastSoundOf(A), out = [];
-    for (const d of A.drops || []) if (d.t >= minFrac * A.dur && end - d.t >= bar && (d.built || d.buildBars >= 2 || d.gap > 0.12)) out.push({ t: d.t, kind: 'build', tension: 1, drop: d, prev: secAt(A, d.t - 0.5), line: lineEnds(A, d.t) });
+    // v8 (#42): a gap-only entry (a silence with no bass return) is a build launch only if the engine saw a build into
+    // it. The silence alone used to qualify it, and on the test songs none of the 27 that did had one: `built` was false
+    // on all 27, the highs rose at most 2 dB and the bass fell at most 5 dB over the 4 bars before, and Drugs From
+    // Amsterdam's 1:34 sat in the song's own fade. Where one falls on a phrase line, outs() still offers it as a phrase launch.
+    for (const d of A.drops || []) if (d.t >= minFrac * A.dur && end - d.t >= bar && (d.built || (d.kind !== 'gap' && (d.buildBars >= 2 || d.gap > 0.12)))) out.push({ t: d.t, kind: 'build', tension: 1, drop: d, prev: secAt(A, d.t - 0.5), line: lineEnds(A, d.t) });
     for (const o of outs(A, minFrac, 2)) { if (out.some(x => Math.abs(x.t - o.t) < 0.5 * bar)) continue; out.push({ t: o.t, kind: 'phrase', tension: 0.5, prev: o.prev, next: o.next, inner: o.inner, line: lineEnds(A, o.t) }); }
     return out.sort((a, b) => a.t - b.t);
   }
@@ -856,8 +852,19 @@ const AnatomyMix = (() => {
   // the longest lead-in of at most `bars` bars before t (and at least 2) that has no beat 20 dB under the song's median
   function soundingBars(P, t, bars) { const g = P.grid; if (!g) return bars; for (let j = 2; j < bars; j++) { const b0 = t - (j + 1) * g.bar; for (let q = 0; q < 4; q++) if (midHi(P, b0 + q * g.beat, b0 + (q + 1) * g.beat) < 0.01) return j; } return bars; }
   const bassStep = (beats, at) => beats >= 4 ? `For the last bar before the switch (from ${at}), turn ${T1}'s bass all the way down: the drop lands in an empty low end.` : `On the last beat before the switch, kill ${T1}'s bass: the drop lands in an empty low end.`;
+  // v7: payoff = how hard the transition lands. A drop landing counts most: how big Track 2's drop is, how much
+  // tension Track 1 hands it (the end of a build beats the end of a chorus), and how much the low end actually jumps
+  // at the landing in this plan (`contrast`, dB, from the sound check). Sound decides first (the check is also a
+  // pass/fail floor). v8 (#44): written once, used by both rate() and finish(); until 2026-10-20 each had its own copy.
+  function payoffOf(x, contrast) {
+    const L = x.landing;
+    if (x.land == null || !L) return clamp(0.3 + 0.3 * clamp(x.score));
+    const landV = clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0));
+    return clamp(0.4 * landV + 0.25 * (x.tension == null ? 0.5 : x.tension) + 0.35 * (contrast > 0 ? clamp(contrast / 12) : 0));
+  }
+  const rankOf = (check, payoff) => clamp(0.55 * check.total + 0.45 * payoff);
   // a quick look at how a candidate will score, using the same sound check and payoff as the final ranking
-  function rate(C, x) { const ck = soundCheck(C, x), L = x.landing; const lv = L ? clamp((L.kind === 'drop' ? 0.45 : L.kind === 'hit' ? 0.35 : 0.15) + clamp(L.impact / 20) * 0.45 + (L.early ? 0.1 : 0)) : 0.3; const pay = clamp(0.4 * lv + 0.25 * (x.tension || 0.5) + 0.35 * clamp((ck.contrast || 0) / 12)); return { ck, pay, total: 0.55 * ck.total + 0.45 * pay }; }
+  function rate(C, x) { const ck = soundCheck(C, x), pay = payoffOf(x, ck.contrast); return { ck, pay, total: rankOf(ck, pay) }; }
   function best2(cands, key) { cands.sort((a, b) => b.r.total - a.r.total); const keep = []; for (const c of cands) { if (keep.length >= 2) break; if (keep.some(k => key(k, c))) continue; keep.push(c); } return keep; }
   const near = (a, b, s) => Math.abs(a - b) < s;
 
@@ -1275,7 +1282,9 @@ const AnatomyMix = (() => {
       for (const s of [0, 1, 2, -1]) {
         if (s && !C.beatmatch) continue;
         const up = mod(family(transposeKey(kb, s)) - family(ka), 12); if (s && !(up === 1 || up === 2)) continue;
-        const preBars = clamp(o.drop.buildBars + 1, 2, 9), { plan, tCut } = cutPlan(C, o.t, tb0, preBars, nbB + 6, 0); plan.decks[1].shift = s;
+        // v8 (#43): like Fake-out, the preview starts after any near-silent beat in Track 1's build (the DJ still lets
+        // the whole build run; the silence is the song's own, before the transition starts)
+        const preBars = soundingBars(A, o.t, clamp(o.drop.buildBars + 1, 2, 9)), { plan, tCut } = cutPlan(C, o.t, tb0, preBars, nbB + 6, 0); plan.decks[1].shift = s;
         const tLand = tCut + nbB * barB / C.rB;
         mark(plan, tCut, `${T2}'s build takes over`); mark(plan, tLand, `${T2}'s drop`);
         const x = landed({ tech: 'escalator', cueA: o.t, cueB: tb0, sync: C.beatmatch ? 'match' : null, shift: s, plan, up, nbB }, tLand, L, 1);
@@ -1317,10 +1326,13 @@ const AnatomyMix = (() => {
     }
     return best2(cands, (k, c) => k.hkind === c.hkind).map(x => {
       const r = x.rr, L = x.landing, gap = r.kind === 'A' ? r.d.gap : r.L.gap;
+      // v8 (#42): a gap-only entry is a real silence with no drop after it (Latch 1:51 is a stop inside its chorus), so
+      // the switch still works but Track 1 promised no drop: say "stop", not "drop"
+      const stop = r.kind === 'A' && r.d.kind === 'gap';
       return Object.assign(x, r.kind === 'A' ? {
-        title: `Silence switch: hijack ${T1}'s drop with ${T2}'s`,
-        special: `${T1} has a ${gap.toFixed(2)} s silence before its drop. Switch inside it and the crowd gets a different drop than the one they were promised.`,
-        steps: [`Cue ${T2} at ${where(B, L.t)}.`, `${T1} goes silent for ${gap.toFixed(2)} s before ${fmtTime(r.d.t)}: that's your switch.`, `Pull ${T1}'s fader inside the silence and start ${T2} exactly where ${T1}'s drop would have hit.`],
+        title: stop ? `Silence switch: ${T2}'s drop lands in ${T1}'s stop` : `Silence switch: hijack ${T1}'s drop with ${T2}'s`,
+        special: stop ? `${T1} stops dead for ${gap.toFixed(2)} s and the crowd waits for the beat to come back. It comes back as ${T2}'s drop.` : `${T1} has a ${gap.toFixed(2)} s silence before its drop. Switch inside it and the crowd gets a different drop than the one they were promised.`,
+        steps: [`Cue ${T2} at ${where(B, L.t)}.`, `${T1} goes silent for ${gap.toFixed(2)} s before ${fmtTime(r.d.t)}: that's your switch.`, stop ? `Pull ${T1}'s fader inside the silence and start ${T2} exactly where ${T1}'s beat would have come back.` : `Pull ${T1}'s fader inside the silence and start ${T2} exactly where ${T1}'s drop would have hit.`],
         why: [`A silence wipes the listener's sense of the groove, so ${C.beatmatch ? 'the new drop has nothing to be compared against' : `even a different tempo (${C.B.bpm ? C.B.bpm.toFixed(0) : '?'} vs ${C.A.bpm ? C.A.bpm.toFixed(0) : '?'} BPM) lands clean`}.`, landWhy(C, L)], warn: [], chips: [`${gap.toFixed(2)} s silence`, 'Lands the drop']
       } : {
         title: `Cut into ${T2}'s silence, right before its drop`,
